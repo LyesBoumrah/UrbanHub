@@ -1,0 +1,2 @@
+-- 10_p1_meteo : tables meteo_station, meteo_obs
+-- Responsable : P1.

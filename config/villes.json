@@ -1,0 +1,7 @@
+[
+  {"ville_id": "paris",     "nom": "Paris",     "lat": 48.8566, "lon": 2.3522},
+  {"ville_id": "lille",     "nom": "Lille",     "lat": 50.6292, "lon": 3.0573},
+  {"ville_id": "marseille", "nom": "Marseille", "lat": 43.2965, "lon": 5.3698},
+  {"ville_id": "rouen",     "nom": "Rouen",     "lat": 49.4432, "lon": 1.0999},
+  {"ville_id": "lyon",      "nom": "Lyon",      "lat": 45.7640, "lon": 4.8357}
+]

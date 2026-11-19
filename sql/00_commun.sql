@@ -1,0 +1,2 @@
+-- 00_commun : tables ref_ville, pipeline_alertes
+-- Exécuté en premier (ordre alphabétique). Responsable : commun.

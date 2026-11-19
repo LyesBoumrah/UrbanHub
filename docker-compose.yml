@@ -1,0 +1,5 @@
+# UrbanHub — environnement Docker (images à version figée, jamais :latest)
+# À compléter à l'étape « socle » : MinIO, ClickHouse, Prefect (serveur + worker), Streamlit.
+# Responsable : commun (modifier uniquement via une PR dédiée).
+
+services: {}

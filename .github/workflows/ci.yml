@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Installation des outils de test
+        run: pip install pytest==8.3.3 flake8==7.1.1
+      - name: Lint (flake8)
+        run: flake8 .
+      - name: Tests (pytest)
+        run: pytest -q
