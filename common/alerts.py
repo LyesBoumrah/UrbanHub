@@ -68,3 +68,14 @@ def emit_alert(
             logger.warning("Impossible d'écrire l'alerte dans ClickHouse : %s", exc)
 
     return alert_record
+
+
+def write_alert(
+    level: str,
+    source: str,
+    message: str,
+    warehouse: ClickHouseWarehouse | None = None,
+) -> dict[str, Any]:
+    """Alias rétrocompatible P1 autour de `emit_alert`."""
+    wh = warehouse or ClickHouseWarehouse()
+    return emit_alert(pipeline=source, niveau=level, message=message, warehouse=wh)

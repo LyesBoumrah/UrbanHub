@@ -6,7 +6,7 @@ Sous-modules :
 - quality   : règles de qualité pures (stdlib uniquement) et diagnostic de criticité.
 - cleaning  : normalisation unifiée (streaming JSON + historique Parquet) -> silver et rejeu bronze.
 - analytics : indicateurs et agrégations métier répondant aux 5 questions P2.
-- flow      : orchestration Prefect 3 (streaming planifié, alertes, backfill).
+- flow      : orchestration Python (streaming planifié toutes les 3 min, alertes, backfill).
 
 Responsable : P2.
 """

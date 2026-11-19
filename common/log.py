@@ -11,9 +11,9 @@ import sys
 from common.config import get_settings
 
 
-def get_logger(name: str, level: str | None = None) -> logging.Logger:
+def get_logger(name: str | None = None, level: str | None = None) -> logging.Logger:
     """Retourne un logger configuré avec un format uniforme UTC."""
-    logger = logging.getLogger(name)
+    logger = logging.getLogger(name or "urbanhub")
     resolved_level = (level or get_settings().log_level).upper()
     logger.setLevel(getattr(logging, resolved_level, logging.INFO))
 
@@ -30,6 +30,8 @@ def get_logger(name: str, level: str | None = None) -> logging.Logger:
     return logger
 
 
+# Alias rétrocompatible utilisé par P1
+setup_logging = get_logger
 def setup_logging(name: str | None = None) -> logging.Logger:
     """Compatibilité P1 : alias de get_logger (nom par défaut « urbanhub »)."""
     return get_logger(name or "urbanhub")

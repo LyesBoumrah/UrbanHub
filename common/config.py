@@ -35,7 +35,7 @@ class Settings:
     # OpenAQ (P3)
     openaq_api_key: str = ""
 
-    # MinIO (data lake bronze)
+    # MinIO (data lake bronze / silver)
     minio_endpoint: str = "localhost:9000"
     minio_root_user: str = "urbanhub"
     minio_root_password: str = "change-me"
@@ -54,27 +54,35 @@ class Settings:
     log_level: str = "INFO"
     local_data_dir: Path = PROJECT_ROOT / "data"
 
+    @classmethod
+    def from_env(cls) -> Settings:
+        """Construit une instance Settings depuis l'environnement / .env."""
+        _load_dotenv_if_available()
+        return cls(
+            openaq_api_key=os.getenv("OPENAQ_API_KEY", ""),
+            minio_endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+            minio_root_user=os.getenv("MINIO_ROOT_USER", "urbanhub"),
+            minio_root_password=os.getenv("MINIO_ROOT_PASSWORD", "change-me"),
+            minio_bucket=os.getenv("MINIO_BUCKET", "urbanhub"),
+            minio_secure=os.getenv("MINIO_SECURE", "false").lower() in {"1", "true", "yes"},
+            clickhouse_host=os.getenv("CLICKHOUSE_HOST", "localhost"),
+            clickhouse_port=int(os.getenv("CLICKHOUSE_PORT", "8123")),
+            clickhouse_user=os.getenv("CLICKHOUSE_USER", "urbanhub"),
+            clickhouse_password=os.getenv("CLICKHOUSE_PASSWORD", "change-me"),
+            clickhouse_db=os.getenv("CLICKHOUSE_DB", "urbanhub"),
+            http_user_agent=os.getenv("HTTP_USER_AGENT", "UrbanHub-school-project/0.1"),
+            log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+            local_data_dir=Path(os.getenv("LOCAL_DATA_DIR", str(PROJECT_ROOT / "data"))),
+        )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Charge et met en cache la configuration depuis l'environnement / .env."""
-    _load_dotenv_if_available()
-    return Settings(
-        openaq_api_key=os.getenv("OPENAQ_API_KEY", ""),
-        minio_endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
-        minio_root_user=os.getenv("MINIO_ROOT_USER", "urbanhub"),
-        minio_root_password=os.getenv("MINIO_ROOT_PASSWORD", "change-me"),
-        minio_bucket=os.getenv("MINIO_BUCKET", "urbanhub"),
-        minio_secure=os.getenv("MINIO_SECURE", "false").lower() in {"1", "true", "yes"},
-        clickhouse_host=os.getenv("CLICKHOUSE_HOST", "localhost"),
-        clickhouse_port=int(os.getenv("CLICKHOUSE_PORT", "8123")),
-        clickhouse_user=os.getenv("CLICKHOUSE_USER", "urbanhub"),
-        clickhouse_password=os.getenv("CLICKHOUSE_PASSWORD", "change-me"),
-        clickhouse_db=os.getenv("CLICKHOUSE_DB", "urbanhub"),
-        http_user_agent=os.getenv("HTTP_USER_AGENT", "UrbanHub-school-project/0.1"),
-        log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        local_data_dir=Path(os.getenv("LOCAL_DATA_DIR", str(PROJECT_ROOT / "data"))),
-    )
+    return Settings.from_env()
+
+
+settings = get_settings()
 
 
 # Compatibilité P1 : `from common.config import settings` (instance chargée à l'import).

@@ -413,12 +413,11 @@ def records_to_dataframes(
 
 
 def build_silver_streaming_key(ts_utc: datetime | None = None, prefix: str = "velo_releve") -> str:
-    """Construit la clé Parquet silver partitionnée par date/heure UTC dans le data lake."""
+    """Construit la clé Parquet silver partitionnée par jour UTC dans le data lake."""
     ref = (ts_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
     date_part = ref.strftime("%Y-%m-%d")
-    hour_part = ref.strftime("%H")
     stamp = ref.strftime("%Y%m%dT%H%M%SZ")
-    return f"silver/velos/dt={date_part}/hr={hour_part}/{prefix}_{stamp}.parquet"
+    return f"silver/velos/dt={date_part}/{prefix}_{stamp}.parquet"
 
 
 def build_silver_historical_key(ville_id: str, year: int | str, ym: str) -> str:

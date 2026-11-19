@@ -43,13 +43,14 @@ class IngestionResult:
 
 
 def build_http_session(user_agent: str | None = None) -> requests.Session:
-    """Crée une session HTTP avec retry exponentiel sur les erreurs transitoires."""
+    """Crée une session HTTP avec retry exponentiel sur erreurs serveur (sans blocage sur 429)."""
     session = requests.Session()
     retry = Retry(
-        total=3,
-        backoff_factor=0.8,
-        status_forcelist=(429, 500, 502, 503, 504),
+        total=2,
+        backoff_factor=0.5,
+        status_forcelist=(500, 502, 503, 504),
         allowed_methods=("GET",),
+        respect_retry_after_header=False,
     )
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("https://", adapter)
@@ -59,12 +60,11 @@ def build_http_session(user_agent: str | None = None) -> requests.Session:
 
 
 def build_bronze_key(ville_id: str, network_id: str, collected_at_utc: datetime) -> str:
-    """Construit la clé d'objet immuable en couche bronze partitionnée par date/heure UTC."""
+    """Construit la clé d'objet immuable en couche bronze partitionnée par jour UTC."""
     ts_utc = collected_at_utc.astimezone(timezone.utc)
     date_part = ts_utc.strftime("%Y-%m-%d")
-    hour_part = ts_utc.strftime("%H")
     stamp = ts_utc.strftime("%Y%m%dT%H%M%SZ")
-    return f"bronze/velos/{ville_id}/dt={date_part}/hr={hour_part}/{network_id}_{stamp}.json"
+    return f"bronze/velos/{ville_id}/dt={date_part}/{network_id}_{stamp}.json"
 
 
 def fetch_network_snapshot(
@@ -76,7 +76,16 @@ def fetch_network_snapshot(
     http = session or build_http_session()
     url = f"{CITYBIKES_API_BASE}/{network_id}"
     response = http.get(url, timeout=timeout)
+    if response.status_code == 429:
+        retry_after = response.headers.get("retry-after", "?")
+        limit_hr = response.headers.get("x-ratelimit-limit-hour", "300")
+        raise RuntimeError(
+            f"Quota API CityBikes dépassé (HTTP 429, limite {limit_hr}/h) — réessayer dans {retry_after}s"
+        )
     response.raise_for_status()
+    remaining = response.headers.get("x-ratelimit-remaining-hour")
+    if remaining is not None and remaining.isdigit() and int(remaining) <= 30:
+        logger.warning("Quota horaire CityBikes bas : %s requêtes restantes cette heure", remaining)
     data: dict[str, Any] = response.json()
     if "network" not in data or "stations" not in data["network"]:
         raise ValueError(f"Réponse CityBikes invalide pour {network_id}: clé network.stations absente")

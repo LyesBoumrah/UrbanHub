@@ -1,5 +1,5 @@
 # UrbanHub — environnement Docker (images à version figée, jamais :latest)
-# Services : Silo/MinIO (bronze S3), ClickHouse (silver/gold), Prefect (orchestration), Streamlit (dashboard).
+# Services : Silo/MinIO (bronze/silver S3), ClickHouse (DWH), CH-UI (client web SQL), worker P2, Streamlit.
 
 services:
   minio:
@@ -35,6 +35,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./sql/00_commun.sql:/docker-entrypoint-initdb.d/00_commun.sql:ro
+      - ./sql/10_p1_meteo.sql:/docker-entrypoint-initdb.d/10_p1_meteo.sql:ro
       - ./sql/20_p2_velos.sql:/docker-entrypoint-initdb.d/20_p2_velos.sql:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
@@ -57,27 +58,8 @@ services:
     volumes:
       - ch_ui_data:/app/data
 
-  prefect-server:
-    image: prefecthq/prefect:3.1.0-python3.11
-    container_name: urbanhub-prefect-server
-    command: prefect server start --host 0.0.0.0 --port 4200
-    environment:
-      PREFECT_SERVER_API_HOST: 0.0.0.0
-      PREFECT_API_URL: http://localhost:${PREFECT_HOST_PORT:-4201}/api
-      PREFECT_UI_API_URL: http://localhost:${PREFECT_HOST_PORT:-4201}/api
-      PREFECT_SERVER_UI_API_URL: http://localhost:${PREFECT_HOST_PORT:-4201}/api
-    ports:
-      - "${PREFECT_HOST_PORT:-4201}:4200"
-    volumes:
-      - prefect_data:/root/.prefect
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
   p2-velos-worker:
-    image: prefecthq/prefect:3.1.0-python3.11
+    image: python:3.11.10-slim
     container_name: urbanhub-p2-velos
     working_dir: /app
     volumes:
@@ -87,11 +69,8 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-      prefect-server:
-        condition: service_healthy
     environment:
       PYTHONPATH: /app
-      PREFECT_API_URL: http://prefect-server:4200/api
       MINIO_ENDPOINT: minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
@@ -106,8 +85,7 @@ services:
       /bin/sh -c "
       pip install --no-cache-dir -q -r requirements.txt &&
       python scripts/init_warehouse.py &&
-      python -m p2_velos.flow --once &&
-      python -m p2_velos.flow --serve --interval 150
+      python -m p2_velos.flow --interval 180
       "
 
   streamlit:
@@ -142,4 +120,3 @@ volumes:
   minio_data:
   clickhouse_data:
   ch_ui_data:
-  prefect_data:

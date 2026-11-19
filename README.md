@@ -30,7 +30,7 @@ OpenAQ ────► p3_pollution/ingestion.py ─┘              │
                                                        │
                                                        ▼
                                           Streamlit (dashboard) + notebooks
-Orchestration : Prefect (un flow par partie) — Environnement : Docker Compose
+Orchestration : Python CLI / Docker worker — Environnement : Docker Compose
 ```
 
 Toutes les données sont stockées en **UTC**. La clé de jointure entre les 3 flux est `(ville_id, heure_utc)`.
@@ -38,9 +38,8 @@ Toutes les données sont stockées en **UTC**. La clé de jointure entre les 3 f
 ## Stack
 
 - **Python 3.11** : requests, pandas, pyarrow
-- **MinIO** : data lake (couche bronze)
-- **ClickHouse** : entrepôt de données (silver / gold)
-- **Prefect 3** : orchestration
+- **MinIO / Silo** : data lake (couches bronze et silver Parquet)
+- **ClickHouse + CH-UI** : entrepôt de données (silver / gold) et client web SQL
 - **Streamlit + Plotly** : dashboards ; **Jupyter** : analyses exploratoires
 - **pytest + flake8 + GitHub Actions** : tests et CI
 - **Docker Compose** : environnement complet
@@ -78,7 +77,7 @@ Toutes les données sont stockées en **UTC**. La clé de jointure entre les 3 f
 | `scripts/init_warehouse.py` | Applique les scripts `sql/*.sql` par ordre alphabétique, peuple `urbanhub.ref_ville` et initialise le bucket bronze. |
 | `scripts/check_sources.py` | Vérifie la disponibilité des réseaux CityBikes configurés dans `config/ref_ville.json`. |
 | `sql/00_commun.sql` | Crée la base `urbanhub` et les tables transverses `ref_ville` et `pipeline_alertes`. |
-| `docker-compose.yml` | Déploie toute la stack conteneurisée (Silo/MinIO, ClickHouse, client web ClickHouse CH-UI, Prefect 3, worker P2, Streamlit) avec des versions d'images figées. |
+| `docker-compose.yml` | Déploie toute la stack conteneurisée (Silo/MinIO, ClickHouse, client web ClickHouse CH-UI, worker P2, Streamlit) avec des versions d'images figées. |
 
 ### Partie 2 — Mobilité urbaine (`p2_velos/`, `sql/20_p2_velos.sql`, `dashboard/`, `notebooks/`, `tests/`)
 
@@ -91,7 +90,7 @@ Documentation détaillée dans [`p2_velos/README.md`](p2_velos/README.md).
 | `p2_velos/quality.py` | Règles qualité pures (stdlib uniquement, exécutables en CI) : parsing timestamps, compteurs, capacité, `bbox`, fraîcheur, statut critique. |
 | `p2_velos/cleaning.py` | Nettoyage et normalisation unifiés (streaming JSON + historique Parquet, rééchantillonnage `1h`, dédoublonnage) + rejeu CLI complet `bronze -> silver`. |
 | `p2_velos/analytics.py` | Fonctions métier partagées répondant aux 5 questions (utilisation, sous-offre, pics horaires, déséquilibres géo, rééquilibrage). |
-| `p2_velos/flow.py` | Flows Prefect 3 : streaming planifié toutes les 2m30 (`velos_streaming_flow`), alertes automatiques et backfill 5 ans (`velos_backfill_flow`). |
+| `p2_velos/flow.py` | Orchestration Python (sans Prefect) : streaming planifié toutes les 3 min (`velos_streaming_flow`), alertes automatiques et backfill 5 ans (`velos_backfill_flow`). |
 | `sql/20_p2_velos.sql` | Tables silver `velo_station` / `velo_releve` et 7 vues analytiques ClickHouse (Q1–Q5, tendance mensuelle, agrégat horaire P4). |
 | `dashboard/Accueil.py` | Page d'accueil Streamlit (état de ClickHouse, villes configurées, dernières alertes pipeline). |
 | `dashboard/pages/2_Velos.py` | Dashboard interactif P2 (5 onglets Q1–Q5, cartes Plotly, fenêtre jusqu'à 5 ans, export CSV rééquilibrage). |
@@ -111,7 +110,7 @@ pip install -r requirements.txt
 # 2. Secrets : copier le modèle puis remplir les valeurs (dont OPENAQ_API_KEY)
 cp .env.example .env
 
-# 3. Lancer l'environnement (MinIO, ClickHouse, Prefect, Streamlit)
+# 3. Lancer l'environnement (MinIO, ClickHouse, CH-UI, worker P2, Streamlit)
 docker compose up -d
 
 # 4. Tests
