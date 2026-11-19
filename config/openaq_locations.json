@@ -1,0 +1,1436 @@
+{
+  "generated_at": "2026-11-19T14:01:30.954813+00:00",
+  "criteria": {
+    "radius_m": 15000,
+    "max_age_hours": 48,
+    "max_sites": 5,
+    "monitors_only": true
+  },
+  "locations": [
+    {
+      "ville_id": "paris",
+      "location_id": 2162591,
+      "name": "PARIS 1er Les Halles",
+      "provider": "EEA",
+      "latitude": 48.86211999987271,
+      "longitude": 2.344615999768577,
+      "distance_m": 829,
+      "sensors": [
+        {
+          "sensor_id": 7773042,
+          "pollutant": "co",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773850,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773420,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775825,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "paris",
+      "location_id": 4039,
+      "name": "PARIS 18eme",
+      "provider": "EEA",
+      "latitude": 48.891665999897555,
+      "longitude": 2.346666999987613,
+      "distance_m": 3921,
+      "sensors": [
+        {
+          "sensor_id": 9542,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9539,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9538,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 1582598,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "paris",
+      "location_id": 4084,
+      "name": "VITRY-SUR-SEINE",
+      "provider": "EEA",
+      "latitude": 48.775898000042204,
+      "longitude": 2.37578800006495,
+      "distance_m": 9140,
+      "sensors": [
+        {
+          "sensor_id": 9863,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 15298,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9647,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9646,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "paris",
+      "location_id": 4070,
+      "name": "Boulevard Haussmann",
+      "provider": "EEA",
+      "latitude": 48.87333300000442,
+      "longitude": 2.3302780002985286,
+      "distance_m": 2460,
+      "sensors": [
+        {
+          "sensor_id": 9680,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9597,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 1562368,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "paris",
+      "location_id": 4041,
+      "name": "Bld peripherique Est",
+      "provider": "EEA",
+      "latitude": 48.83861500018727,
+      "longitude": 2.4127809998590957,
+      "distance_m": 4875,
+      "sensors": [
+        {
+          "sensor_id": 9643,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9544,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 9548,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lille",
+      "location_id": 3831,
+      "name": "Wattignies",
+      "provider": "EEA",
+      "latitude": 50.59774000018877,
+      "longitude": 3.049460000049802,
+      "distance_m": 3543,
+      "sensors": [
+        {
+          "sensor_id": 13053060,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5078749,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 13931342,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 13931336,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lille",
+      "location_id": 2162762,
+      "name": "Tourcoing Houpline",
+      "provider": "EEA",
+      "latitude": 50.73333400021155,
+      "longitude": 3.1736110000365456,
+      "distance_m": 14205,
+      "sensors": [
+        {
+          "sensor_id": 7774098,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774636,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773244,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773458,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lille",
+      "location_id": 3598,
+      "name": "Roubaix Serres",
+      "provider": "EEA",
+      "latitude": 50.70653500003718,
+      "longitude": 3.1806600001209713,
+      "distance_m": 12250,
+      "sensors": [
+        {
+          "sensor_id": 8547,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7941,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7944,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "marseille",
+      "location_id": 2162726,
+      "name": "MARSEILLE 5 AVENUES",
+      "provider": "EEA",
+      "latitude": 43.305285999927285,
+      "longitude": 5.394716000050973,
+      "distance_m": 2245,
+      "sensors": [
+        {
+          "sensor_id": 7775172,
+          "pollutant": "co",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7772760,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775562,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7772890,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775645,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "marseille",
+      "location_id": 6488476,
+      "name": "MARSEILLE PLOMBIERES 2",
+      "provider": "EEA",
+      "latitude": 43.31817600008412,
+      "longitude": 5.379957999558043,
+      "distance_m": 2545,
+      "sensors": [
+        {
+          "sensor_id": 17244394,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 17253681,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 17253686,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "marseille",
+      "location_id": 2162724,
+      "name": "MARSEILLE ST LOUIS",
+      "provider": "EEA",
+      "latitude": 43.34804999975112,
+      "longitude": 5.360119000257361,
+      "distance_m": 5781,
+      "sensors": [
+        {
+          "sensor_id": 7772964,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775870,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774788,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "marseille",
+      "location_id": 2162727,
+      "name": "VALLEE HUVEAUNE",
+      "provider": "EEA",
+      "latitude": 43.28333999977458,
+      "longitude": 5.5113839995850205,
+      "distance_m": 11583,
+      "sensors": [
+        {
+          "sensor_id": 7773652,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rouen",
+      "location_id": 2162684,
+      "name": "Rouen Proxi Quai de Paris",
+      "provider": "EEA",
+      "latitude": 49.43669999989953,
+      "longitude": 1.098837999781717,
+      "distance_m": 727,
+      "sensors": [
+        {
+          "sensor_id": 7775100,
+          "pollutant": "co",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773878,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7772945,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773073,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rouen",
+      "location_id": 2162686,
+      "name": "Centre Hospitalier",
+      "provider": "EEA",
+      "latitude": 49.40050000018459,
+      "longitude": 1.0990419999962184,
+      "distance_m": 4749,
+      "sensors": [
+        {
+          "sensor_id": 7774949,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7772938,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773516,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773828,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rouen",
+      "location_id": 4160643,
+      "name": "Petit Quevilly",
+      "provider": "EEA",
+      "latitude": 49.42814999975319,
+      "longitude": 1.058024999581805,
+      "distance_m": 3468,
+      "sensors": [
+        {
+          "sensor_id": 12865726,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 12865724,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 12865725,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rouen",
+      "location_id": 4126,
+      "name": "Mesnil Esnard",
+      "provider": "EEA",
+      "latitude": 49.40619000028539,
+      "longitude": 1.1551500000911794,
+      "distance_m": 5745,
+      "sensors": [
+        {
+          "sensor_id": 9786,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rouen",
+      "location_id": 3461,
+      "name": "Gd Couronne Mairie",
+      "provider": "EEA",
+      "latitude": 49.358214999834985,
+      "longitude": 1.0078530004089747,
+      "distance_m": 11575,
+      "sensors": [
+        {
+          "sensor_id": 7714,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lyon",
+      "location_id": 2696,
+      "name": "LYON Centre",
+      "provider": "EEA",
+      "latitude": 45.757731999933235,
+      "longitude": 4.854214000165473,
+      "distance_m": 1600,
+      "sensors": [
+        {
+          "sensor_id": 8556,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8557,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8558,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8559,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lyon",
+      "location_id": 2680,
+      "name": "Lyon Périphérique",
+      "provider": "EEA",
+      "latitude": 45.774819999808635,
+      "longitude": 4.898572000411539,
+      "distance_m": 5036,
+      "sensors": [
+        {
+          "sensor_id": 7586,
+          "pollutant": "co",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5587,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5603,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lyon",
+      "location_id": 3638,
+      "name": "GERLAND",
+      "provider": "EEA",
+      "latitude": 45.73529000012643,
+      "longitude": 4.829793999852605,
+      "distance_m": 3224,
+      "sensors": [
+        {
+          "sensor_id": 8041,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8043,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 24867,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lyon",
+      "location_id": 3586,
+      "name": "A7 SUD LYONNAIS",
+      "provider": "EEA",
+      "latitude": 45.720024000044454,
+      "longitude": 4.818156000156704,
+      "distance_m": 5075,
+      "sensors": [
+        {
+          "sensor_id": 7920,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7925,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7922,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "lyon",
+      "location_id": 3647,
+      "name": "VAULX EN VELIN",
+      "provider": "EEA",
+      "latitude": 45.77889999997353,
+      "longitude": 4.924699999913453,
+      "distance_m": 7118,
+      "sensors": [
+        {
+          "sensor_id": 8070,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8069,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8067,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "toulouse",
+      "location_id": 2162671,
+      "name": "Toulouse Berthelot",
+      "provider": "EEA",
+      "latitude": 43.58734500001323,
+      "longitude": 1.4440030003237578,
+      "distance_m": 1928,
+      "sensors": [
+        {
+          "sensor_id": 7773742,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773025,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7852968,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7852967,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "toulouse",
+      "location_id": 3590,
+      "name": "Toulouse Mazades",
+      "provider": "EEA",
+      "latitude": 43.62360800014131,
+      "longitude": 1.4385309999071265,
+      "distance_m": 2150,
+      "sensors": [
+        {
+          "sensor_id": 8111,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7928,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8113,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 24874,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "toulouse",
+      "location_id": 2162669,
+      "name": "Toulouse école m. Jacquier",
+      "provider": "EEA",
+      "latitude": 43.57569499986907,
+      "longitude": 1.4180640000694156,
+      "distance_m": 3852,
+      "sensors": [
+        {
+          "sensor_id": 7774953,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773210,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774657,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773517,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "toulouse",
+      "location_id": 6529885,
+      "name": "Toulouse Arcole",
+      "provider": "EEA",
+      "latitude": 43.61065299978379,
+      "longitude": 1.4428169995698992,
+      "distance_m": 671,
+      "sensors": [
+        {
+          "sensor_id": 17548378,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 17564286,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 17564285,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "toulouse",
+      "location_id": 2162670,
+      "name": "Toulouse Port de l'Embouchure",
+      "provider": "EEA",
+      "latitude": 43.610386000052614,
+      "longitude": 1.4152000002637386,
+      "distance_m": 2425,
+      "sensors": [
+        {
+          "sensor_id": 7775402,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774169,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773381,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "bordeaux",
+      "location_id": 2162620,
+      "name": "TALENCE",
+      "provider": "EEA",
+      "latitude": 44.80045999978738,
+      "longitude": -0.5893979996894178,
+      "distance_m": 4227,
+      "sensors": [
+        {
+          "sensor_id": 7774354,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774134,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7772882,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775560,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "bordeaux",
+      "location_id": 2162616,
+      "name": "BASSENS",
+      "provider": "EEA",
+      "latitude": 44.90029500003576,
+      "longitude": -0.5158349997004273,
+      "distance_m": 8562,
+      "sensors": [
+        {
+          "sensor_id": 7774008,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773604,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775243,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775407,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "bordeaux",
+      "location_id": 2162617,
+      "name": "Bordeaux_GAUTIER",
+      "provider": "EEA",
+      "latitude": 44.83382400000155,
+      "longitude": -0.5985249997570591,
+      "distance_m": 1591,
+      "sensors": [
+        {
+          "sensor_id": 7775884,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775472,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773423,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "bordeaux",
+      "location_id": 2162618,
+      "name": "GRAND PARC",
+      "provider": "EEA",
+      "latitude": 44.86120999988481,
+      "longitude": -0.5803700002542934,
+      "distance_m": 2603,
+      "sensors": [
+        {
+          "sensor_id": 7774431,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775081,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774966,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "bordeaux",
+      "location_id": 3005840,
+      "name": "Floirac Branne",
+      "provider": "EEA",
+      "latitude": 44.84340999981984,
+      "longitude": -0.5069799996193494,
+      "distance_m": 5744,
+      "sensors": [
+        {
+          "sensor_id": 10182724,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 10189267,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "nantes",
+      "location_id": 6159395,
+      "name": "CIM BOUTEILLERIE",
+      "provider": "EEA",
+      "latitude": 47.222187000266544,
+      "longitude": -1.537432000275925,
+      "distance_m": 1295,
+      "sensors": [
+        {
+          "sensor_id": 14850202,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 14850195,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 14850168,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 14850158,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "nantes",
+      "location_id": 6159397,
+      "name": "FRERES GONCOURT",
+      "provider": "EEA",
+      "latitude": 47.23356000027512,
+      "longitude": -1.564810999930711,
+      "distance_m": 1887,
+      "sensors": [
+        {
+          "sensor_id": 14850172,
+          "pollutant": "co",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 14850203,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 14850182,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 14850162,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "nantes",
+      "location_id": 2162596,
+      "name": "LA CHABOSSIERE",
+      "provider": "EEA",
+      "latitude": 47.18594000021655,
+      "longitude": -1.591504000220464,
+      "distance_m": 4612,
+      "sensors": [
+        {
+          "sensor_id": 7773730,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775188,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774899,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "nantes",
+      "location_id": 3792,
+      "name": "EPINETTES",
+      "provider": "EEA",
+      "latitude": 47.14608800004491,
+      "longitude": -1.6902690001468232,
+      "distance_m": 13113,
+      "sensors": [
+        {
+          "sensor_id": 8509,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "strasbourg",
+      "location_id": 3196,
+      "name": "Kehl",
+      "provider": "EEA",
+      "latitude": 48.578177999862866,
+      "longitude": 7.802316999571487,
+      "distance_m": 3743,
+      "sensors": [
+        {
+          "sensor_id": 11356,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 11355,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 11066,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 1300228,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "strasbourg",
+      "location_id": 3775,
+      "name": "Strasbourg Nord",
+      "provider": "EEA",
+      "latitude": 48.610363000093216,
+      "longitude": 7.781631000348977,
+      "distance_m": 4652,
+      "sensors": [
+        {
+          "sensor_id": 8455,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8454,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8453,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 17244401,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "strasbourg",
+      "location_id": 2162767,
+      "name": "Strasbourg Neudorf Ecoquartier Danube",
+      "provider": "EEA",
+      "latitude": 48.57280699986449,
+      "longitude": 7.767832999755778,
+      "distance_m": 1163,
+      "sensors": [
+        {
+          "sensor_id": 7774349,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775795,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775539,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "strasbourg",
+      "location_id": 3777,
+      "name": "Strasbourg Clemenceau",
+      "provider": "EEA",
+      "latitude": 48.590429999772034,
+      "longitude": 7.744983000336326,
+      "distance_m": 1965,
+      "sensors": [
+        {
+          "sensor_id": 5078524,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5078346,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 16255676,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "strasbourg",
+      "location_id": 2162766,
+      "name": "Strasbourg A35 Remparts",
+      "provider": "EEA",
+      "latitude": 48.58805500000642,
+      "longitude": 7.729721999878151,
+      "distance_m": 2320,
+      "sensors": [
+        {
+          "sensor_id": 7775720,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774582,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "montpellier",
+      "location_id": 2720,
+      "name": "Montpellier Prés d'Arènes",
+      "provider": "EEA",
+      "latitude": 43.591500000324274,
+      "longitude": 3.886809999908339,
+      "distance_m": 2294,
+      "sensors": [
+        {
+          "sensor_id": 5673,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5670,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5671,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 5672,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "montpellier",
+      "location_id": 2162662,
+      "name": "Montpellier Liberté",
+      "provider": "EEA",
+      "latitude": 43.61160700016005,
+      "longitude": 3.8278680001449295,
+      "distance_m": 3943,
+      "sensors": [
+        {
+          "sensor_id": 7773196,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7852969,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7852966,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "montpellier",
+      "location_id": 2162661,
+      "name": "Montpellier Chaptal",
+      "provider": "EEA",
+      "latitude": 43.611299999758124,
+      "longitude": 3.866260000229952,
+      "distance_m": 845,
+      "sensors": [
+        {
+          "sensor_id": 7774458,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "montpellier",
+      "location_id": 5566646,
+      "name": "Montpellier Antigone",
+      "provider": "EEA",
+      "latitude": 43.608829999916466,
+      "longitude": 3.8957210000659144,
+      "distance_m": 1551,
+      "sensors": [
+        {
+          "sensor_id": 13961390,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "montpellier",
+      "location_id": 2162659,
+      "name": "Montpellier Périurbaine Sud (Lattes)",
+      "provider": "EEA",
+      "latitude": 43.5704999997927,
+      "longitude": 3.9118000001336015,
+      "distance_m": 5299,
+      "sensors": [
+        {
+          "sensor_id": 7775807,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rennes",
+      "location_id": 2162748,
+      "name": "Rennes Thabor",
+      "provider": "EEA",
+      "latitude": 48.11521000019346,
+      "longitude": -1.6730879998891797,
+      "distance_m": 421,
+      "sensors": [
+        {
+          "sensor_id": 7774882,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774200,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773016,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774530,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rennes",
+      "location_id": 2162747,
+      "name": "Rennes Laennec",
+      "provider": "EEA",
+      "latitude": 48.108609999936846,
+      "longitude": -1.6658599997046095,
+      "distance_m": 1313,
+      "sensors": [
+        {
+          "sensor_id": 7773793,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773070,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775768,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rennes",
+      "location_id": 4036,
+      "name": "Rennes Les Halles",
+      "provider": "EEA",
+      "latitude": 48.10751000025733,
+      "longitude": -1.6798399998726847,
+      "distance_m": 1099,
+      "sensors": [
+        {
+          "sensor_id": 9529,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "rennes",
+      "location_id": 2162749,
+      "name": "MORDELLES BELLAIS",
+      "provider": "EEA",
+      "latitude": 48.08288200017111,
+      "longitude": -1.8345830001976633,
+      "distance_m": 12288,
+      "sensors": [
+        {
+          "sensor_id": 7773120,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "clermont-ferrand",
+      "location_id": 3727,
+      "name": "Montferrand",
+      "provider": "EEA",
+      "latitude": 45.7972800002671,
+      "longitude": 3.113833000221961,
+      "distance_m": 3055,
+      "sensors": [
+        {
+          "sensor_id": 8310,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8311,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8312,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8313,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "clermont-ferrand",
+      "location_id": 3624,
+      "name": "Beaulieu",
+      "provider": "EEA",
+      "latitude": 45.7690000000847,
+      "longitude": 3.1550000004242014,
+      "distance_m": 5367,
+      "sensors": [
+        {
+          "sensor_id": 8008,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 8009,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 10182727,
+          "pollutant": "pm25",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "clermont-ferrand",
+      "location_id": 2162732,
+      "name": "Riom Périurbaine",
+      "provider": "EEA",
+      "latitude": 45.896739999896965,
+      "longitude": 3.122253999934768,
+      "distance_m": 13566,
+      "sensors": [
+        {
+          "sensor_id": 7774661,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7775652,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7773478,
+          "pollutant": "pm10",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "clermont-ferrand",
+      "location_id": 2162731,
+      "name": "Royat Périurbaine",
+      "provider": "EEA",
+      "latitude": 45.764109999736554,
+      "longitude": 3.046110999822229,
+      "distance_m": 3497,
+      "sensors": [
+        {
+          "sensor_id": 7774385,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        },
+        {
+          "sensor_id": 7774072,
+          "pollutant": "o3",
+          "unit": "µg/m³"
+        }
+      ]
+    },
+    {
+      "ville_id": "clermont-ferrand",
+      "location_id": 3708,
+      "name": "Edouard Michelin",
+      "provider": "EEA",
+      "latitude": 45.780434000295585,
+      "longitude": 3.1115920000321267,
+      "distance_m": 1946,
+      "sensors": [
+        {
+          "sensor_id": 8254,
+          "pollutant": "no2",
+          "unit": "µg/m³"
+        }
+      ]
+    }
+  ]
+}
