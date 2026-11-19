@@ -12,8 +12,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Installation des outils de test
-        run: pip install pytest==8.3.3 flake8==7.1.1
+          cache: pip            # réutilise les paquets téléchargés d'une exécution à l'autre
+          cache-dependency-path: requirements.txt
+      # Toutes les dépendances du projet : les tests importent le code (requests, dotenv, pandas...).
+      # Chaque membre ajoute les siennes dans SA section de requirements.txt.
+      - name: Installation des dépendances
+        run: pip install -r requirements.txt
       - name: Lint (flake8)
         run: flake8 .
       - name: Tests (pytest)
