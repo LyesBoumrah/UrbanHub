@@ -85,6 +85,10 @@ def get_settings() -> Settings:
 settings = get_settings()
 
 
+# Compatibilité P1 : `from common.config import settings` (instance chargée à l'import).
+settings = get_settings()
+
+
 def load_villes(path: Path | None = None) -> list[dict[str, Any]]:
     """Charge config/villes.json."""
     target = path or (CONFIG_DIR / "villes.json")

@@ -1,7 +1,7 @@
 -- 10_p1_meteo : tables meteo_station, meteo_obs
 -- Responsable : P1.
 
-CREATE TABLE IF NOT EXISTS meteo_station
+CREATE TABLE IF NOT EXISTS urbanhub.meteo_station
 (
     station_id String,
     nom        String,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS meteo_station
 ENGINE = MergeTree
 ORDER BY station_id;
 
-CREATE TABLE IF NOT EXISTS meteo_obs
+CREATE TABLE IF NOT EXISTS urbanhub.meteo_obs
 (
     station_id      String,
     heure_utc       DateTime64(3),

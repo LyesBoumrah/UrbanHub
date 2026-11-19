@@ -129,3 +129,32 @@ Warehouse = ClickHouseWarehouse
 def get_warehouse(settings: Settings | None = None, database: str | None = None) -> ClickHouseWarehouse:
     """Fabrique un client ClickHouseWarehouse."""
     return ClickHouseWarehouse(settings=settings, database=database)
+
+
+class Warehouse(ClickHouseWarehouse):
+    """Compatibilité P1 : client ClickHouse configurable par arguments, avec command()."""
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+        database: str | None = None,
+    ) -> None:
+        from dataclasses import replace
+
+        base = get_settings()
+        overrides = {
+            "clickhouse_host": host,
+            "clickhouse_port": port,
+            "clickhouse_user": user,
+            "clickhouse_password": password,
+        }
+        super().__init__(
+            settings=replace(base, **{k: v for k, v in overrides.items() if v is not None}),
+            database=database,
+        )
+
+    def command(self, sql: str) -> Any:
+        return self.execute(sql)

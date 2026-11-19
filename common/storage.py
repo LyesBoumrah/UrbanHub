@@ -226,3 +226,35 @@ def get_storage(use_local: bool = False, settings: Settings | None = None) -> Mi
         cfg = settings or get_settings()
         return LocalBronzeStorage(base_dir=cfg.local_data_dir)
     return MinIOStorage(settings=settings)
+
+
+class Storage(MinIOStorage):
+    """Compatibilité P1 : client MinIO configurable par arguments, avec read_bytes / read_csv."""
+
+    def __init__(
+        self,
+        endpoint: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        bucket: str | None = None,
+        secure: bool | None = None,
+    ) -> None:
+        from dataclasses import replace
+
+        base = get_settings()
+        overrides = {
+            "minio_endpoint": endpoint,
+            "minio_root_user": access_key,
+            "minio_root_password": secret_key,
+            "minio_bucket": bucket,
+            "minio_secure": secure,
+        }
+        super().__init__(settings=replace(base, **{k: v for k, v in overrides.items() if v is not None}))
+
+    def read_bytes(self, key: str) -> bytes:
+        return self.get_bytes(key)
+
+    def read_csv(self, key: str) -> Any:
+        import pandas as pd
+
+        return pd.read_csv(io.BytesIO(self.get_bytes(key)))
