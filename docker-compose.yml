@@ -1,5 +1,145 @@
 # UrbanHub — environnement Docker (images à version figée, jamais :latest)
-# À compléter à l'étape « socle » : MinIO, ClickHouse, Prefect (serveur + worker), Streamlit.
-# Responsable : commun (modifier uniquement via une PR dédiée).
+# Services : Silo/MinIO (bronze S3), ClickHouse (silver/gold), Prefect (orchestration), Streamlit (dashboard).
 
-services: {}
+services:
+  minio:
+    # Drop-in replacement open-source de minio/minio (images officielles MinIO retirées de Docker Hub)
+    image: pgsty/silo:RELEASE.2026-11-12T00-00-00Z
+    container_name: urbanhub-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8.5
+    container_name: urbanhub-clickhouse
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-urbanhub}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-urbanhub}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./sql/00_commun.sql:/docker-entrypoint-initdb.d/00_commun.sql:ro
+      - ./sql/20_p2_velos.sql:/docker-entrypoint-initdb.d/20_p2_velos.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse-ui:
+    image: ghcr.io/caioricciuti/ch-ui:v2.33.0
+    container_name: urbanhub-clickhouse-ui
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "${CH_UI_HOST_PORT:-3488}:3488"
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CONNECTION_NAME: UrbanHub ClickHouse
+      APP_URL: http://localhost:${CH_UI_HOST_PORT:-3488}
+    volumes:
+      - ch_ui_data:/app/data
+
+  prefect-server:
+    image: prefecthq/prefect:3.1.0-python3.11
+    container_name: urbanhub-prefect-server
+    command: prefect server start --host 0.0.0.0 --port 4200
+    environment:
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_API_URL: http://localhost:${PREFECT_HOST_PORT:-4201}/api
+      PREFECT_UI_API_URL: http://localhost:${PREFECT_HOST_PORT:-4201}/api
+      PREFECT_SERVER_UI_API_URL: http://localhost:${PREFECT_HOST_PORT:-4201}/api
+    ports:
+      - "${PREFECT_HOST_PORT:-4201}:4200"
+    volumes:
+      - prefect_data:/root/.prefect
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  p2-velos-worker:
+    image: prefecthq/prefect:3.1.0-python3.11
+    container_name: urbanhub-p2-velos
+    working_dir: /app
+    volumes:
+      - .:/app
+    depends_on:
+      minio:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PYTHONPATH: /app
+      PREFECT_API_URL: http://prefect-server:4200/api
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
+      MINIO_BUCKET: ${MINIO_BUCKET:-urbanhub}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-urbanhub}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-urbanhub}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: >
+      /bin/sh -c "
+      pip install --no-cache-dir -q -r requirements.txt &&
+      python scripts/init_warehouse.py &&
+      python -m p2_velos.flow --once &&
+      python -m p2_velos.flow --serve --interval 150
+      "
+
+  streamlit:
+    image: python:3.11.10-slim
+    container_name: urbanhub-streamlit
+    working_dir: /app
+    volumes:
+      - .:/app
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+    environment:
+      PYTHONPATH: /app
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
+      MINIO_BUCKET: ${MINIO_BUCKET:-urbanhub}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-urbanhub}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-urbanhub}
+    command: >
+      /bin/sh -c "
+      pip install --no-cache-dir -q -r requirements.txt &&
+      streamlit run dashboard/Accueil.py --server.port=8501 --server.address=0.0.0.0
+      "
+
+volumes:
+  minio_data:
+  clickhouse_data:
+  ch_ui_data:
+  prefect_data:
