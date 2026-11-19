@@ -4,13 +4,14 @@ Projet école Big Data. Plateforme qui **collecte, stocke, traite, analyse et vi
 urbaines (météo, vélos en libre-service, pollution de l'air) pour produire des indicateurs utiles aux
 décideurs publics.
 
-**Villes couvertes** : Paris, Lille, Marseille, Rouen, Lyon.
+**Villes couvertes** : Paris, Lille, Marseille, Rouen, Lyon, Toulouse, Bordeaux,
+Nantes, Strasbourg, Montpellier, Rennes, Clermont-Ferrand.
 
 ## Les 4 parties
 
 | Partie | Type de flux | Thème | Source | Responsable |
 |---|---|---|---|---|
-| P1 | Batch (historique 5 ans) | Météo | [NOAA Global Hourly (ISD)](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database) | Membre P1 |
+| P1 | Batch (historique 5 ans) | Météo | [Open-Meteo Archive API](https://archive-api.open-meteo.com/) | Membre P1 |
 | P2 | Streaming (toutes les 3 min) | Vélos | [CityBikes API v2](https://api.citybik.es/v2/) | Membre P2 |
 | P3 | IoT (horaire) | Pollution | [OpenAQ API v3](https://docs.openaq.org) | Membre P3 |
 | P4 | Analyse croisée | Météo × mobilité × pollution | P1 + P2 + P3 | Commun |

@@ -1,7 +1,14 @@
 [
-  {"ville_id": "paris",     "nom": "Paris",     "lat": 48.8566, "lon": 2.3522},
-  {"ville_id": "lille",     "nom": "Lille",     "lat": 50.6292, "lon": 3.0573},
-  {"ville_id": "marseille", "nom": "Marseille", "lat": 43.2965, "lon": 5.3698},
-  {"ville_id": "rouen",     "nom": "Rouen",     "lat": 49.4432, "lon": 1.0999},
-  {"ville_id": "lyon",      "nom": "Lyon",      "lat": 45.7640, "lon": 4.8357}
+  {"ville_id": "paris",            "nom": "Paris",            "lat": 48.8566, "lon": 2.3522},
+  {"ville_id": "lille",            "nom": "Lille",            "lat": 50.6292, "lon": 3.0573},
+  {"ville_id": "marseille",        "nom": "Marseille",        "lat": 43.2965, "lon": 5.3698},
+  {"ville_id": "rouen",            "nom": "Rouen",            "lat": 49.4432, "lon": 1.0999},
+  {"ville_id": "lyon",             "nom": "Lyon",             "lat": 45.7640, "lon": 4.8357},
+  {"ville_id": "toulouse",         "nom": "Toulouse",         "lat": 43.6047, "lon": 1.4442},
+  {"ville_id": "bordeaux",         "nom": "Bordeaux",         "lat": 44.8378, "lon": -0.5792},
+  {"ville_id": "nantes",           "nom": "Nantes",           "lat": 47.2184, "lon": -1.5536},
+  {"ville_id": "strasbourg",       "nom": "Strasbourg",       "lat": 48.5734, "lon": 7.7521},
+  {"ville_id": "montpellier",      "nom": "Montpellier",      "lat": 43.6108, "lon": 3.8767},
+  {"ville_id": "rennes",           "nom": "Rennes",           "lat": 48.1173, "lon": -1.6778},
+  {"ville_id": "clermont-ferrand", "nom": "Clermont-Ferrand", "lat": 45.7772, "lon": 3.0870}
 ]
