@@ -72,9 +72,10 @@ def seed_ref_ville(warehouse: ClickHouseWarehouse) -> int:
 
 
 def init_warehouse(sql_dir: Path | None = None) -> None:
-    """Exécute les scripts SQL par ordre alphabétique puis charge ref_ville."""
+    """Exécute les scripts SQL par ordre alphabétique puis charge ref_ville et crée le bucket."""
     target_dir = sql_dir or (PROJECT_ROOT / "sql")
-    warehouse = get_warehouse(database="")
+    bootstrap_wh = get_warehouse(database="")
+    db_warehouse: ClickHouseWarehouse | None = None
 
     for sql_file in sorted(target_dir.glob("*.sql")):
         statements = split_sql_statements(sql_file.read_text(encoding="utf-8"))
@@ -82,45 +83,23 @@ def init_warehouse(sql_dir: Path | None = None) -> None:
             logger.info("Fichier SQL vide ignoré : %s", sql_file.name)
             continue
         logger.info("Application de %s (%d instructions)", sql_file.name, len(statements))
+        # 00_commun.sql crée la base `urbanhub`; les fichiers suivants utilisent la base cible
+        target_wh = bootstrap_wh if sql_file.name.startswith("00_") else (db_warehouse or get_warehouse())
         for stmt in statements:
-            warehouse.execute(stmt)
+            target_wh.execute(stmt)
+        if db_warehouse is None:
+            db_warehouse = get_warehouse()
 
-    db_warehouse = get_warehouse()
-    inserted = seed_ref_ville(db_warehouse)
+    inserted = seed_ref_ville(db_warehouse or get_warehouse())
     logger.info("urbanhub.ref_ville initialisée avec %d villes", inserted)
 
     try:
         storage = get_storage(use_local=False)
         storage.ensure_bucket()
-        logger.info("Bucket bronze prêt : %s", storage.bucket)
+        logger.info("Bucket bronze/silver prêt : %s", storage.bucket)
     except Exception as exc:
-        logger.warning("Initialisation du bucket bronze ignorée : %s", exc)
+        logger.warning("Initialisation du bucket MinIO ignorée : %s", exc)
 
 
 if __name__ == "__main__":
     init_warehouse()
-from pathlib import Path
-
-from common.log import setup_logging
-from common.warehouse import Warehouse
-
-log = setup_logging(__name__)
-SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
-
-
-def split_statements(sql: str) -> list[str]:
-    """Découpe un fichier SQL en instructions (séparateur ';')."""
-    return [s.strip() for s in sql.split(";") if s.strip()]
-
-
-def main() -> None:
-    wh = Warehouse()
-    for sql_file in sorted(SQL_DIR.glob("*.sql")):
-        log.info("Application de %s", sql_file.name)
-        for statement in split_statements(sql_file.read_text(encoding="utf-8")):
-            wh.command(statement)
-    log.info("Initialisation du warehouse terminée.")
-
-
-if __name__ == "__main__":
-    main()

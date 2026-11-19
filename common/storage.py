@@ -1,7 +1,7 @@
-"""Client MinIO (data lake, couche bronze) : put_json, put_csv, exists, list.
+"""Client MinIO (data lake, bronze & silver) : put_json, put_csv, put_parquet, exists, list.
 
 Inclut un backend fichier local (LocalBronzeStorage) respectant la même interface
-pour les tests ou l'exécution hors Docker.
+pour les tests ou l'exécution hors Docker, ainsi que l'alias `Storage` pour P1.
 
 Responsable : commun.
 """
@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 
 class LocalBronzeStorage:
-    """Stockage bronze sur disque local (data/) avec la même API que MinIOStorage."""
+    """Stockage objet sur disque local (data/) avec la même API que MinIOStorage."""
 
     def __init__(self, base_dir: Path | None = None) -> None:
         self.base_dir = Path(base_dir or get_settings().local_data_dir)
@@ -44,11 +44,17 @@ class LocalBronzeStorage:
         target = self._resolve(key)
         return json.loads(target.read_text(encoding="utf-8"))
 
-    def put_csv(self, key: str, content: str) -> str:
+    def put_csv(self, key: str, content: Any) -> str:
+        text = content.to_csv(index=False) if hasattr(content, "to_csv") else str(content)
         target = self._resolve(key)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        target.write_text(text, encoding="utf-8")
         return key
+
+    def read_csv(self, key: str) -> Any:
+        import pandas as pd
+
+        return pd.read_csv(io.BytesIO(self.get_bytes(key)))
 
     def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         del content_type
@@ -59,6 +65,8 @@ class LocalBronzeStorage:
 
     def get_bytes(self, key: str) -> bytes:
         return self._resolve(key).read_bytes()
+
+    read_bytes = get_bytes
 
     def put_parquet(self, key: str, df: Any) -> str:
         buf = io.BytesIO()
@@ -89,11 +97,23 @@ class LocalBronzeStorage:
 
 
 class MinIOStorage:
-    """Client MinIO pour la couche bronze immuable du data lake."""
+    """Client MinIO/Silo pour le data lake (couches bronze et silver)."""
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        endpoint: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        bucket: str | None = None,
+        secure: bool | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
-        self.bucket = self.settings.minio_bucket
+        self._endpoint = endpoint or self.settings.minio_endpoint
+        self._access_key = access_key or self.settings.minio_root_user
+        self._secret_key = secret_key or self.settings.minio_root_password
+        self._secure = self.settings.minio_secure if secure is None else secure
+        self.bucket = bucket or self.settings.minio_bucket
         self._client: Any = None
 
     @property
@@ -102,10 +122,10 @@ class MinIOStorage:
             from minio import Minio
 
             self._client = Minio(
-                endpoint=self.settings.minio_endpoint,
-                access_key=self.settings.minio_root_user,
-                secret_key=self.settings.minio_root_password,
-                secure=self.settings.minio_secure,
+                endpoint=self._endpoint,
+                access_key=self._access_key,
+                secret_key=self._secret_key,
+                secure=self._secure,
             )
         return self._client
 
@@ -134,9 +154,10 @@ class MinIOStorage:
             response.close()
             response.release_conn()
 
-    def put_csv(self, key: str, content: str) -> str:
+    def put_csv(self, key: str, content: Any) -> str:
         self.ensure_bucket()
-        data = content.encode("utf-8")
+        text = content.to_csv(index=False) if hasattr(content, "to_csv") else str(content)
+        data = text.encode("utf-8")
         self.client.put_object(
             bucket_name=self.bucket,
             object_name=key.lstrip("/"),
@@ -145,6 +166,11 @@ class MinIOStorage:
             content_type="text/csv; charset=utf-8",
         )
         return key
+
+    def read_csv(self, key: str) -> Any:
+        import pandas as pd
+
+        return pd.read_csv(io.BytesIO(self.get_bytes(key)))
 
     def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
         self.ensure_bucket()
@@ -165,6 +191,8 @@ class MinIOStorage:
             response.close()
             response.release_conn()
 
+    read_bytes = get_bytes
+
     def put_parquet(self, key: str, df: Any) -> str:
         buf = io.BytesIO()
         df.to_parquet(buf, index=False)
@@ -178,63 +206,6 @@ class MinIOStorage:
     def exists(self, key: str) -> bool:
         try:
             self.client.stat_object(self.bucket, key.lstrip("/"))
-from typing import Iterable
-
-import pandas as pd
-from minio import Minio
-
-from .config import settings
-from .log import setup_logging
-
-log = setup_logging(__name__)
-
-
-class Storage:
-    """Encapsule les écritures/lectures MinIO du data lake."""
-
-    def __init__(
-        self,
-        endpoint: str | None = None,
-        access_key: str | None = None,
-        secret_key: str | None = None,
-        bucket: str | None = None,
-        secure: bool = False,
-    ) -> None:
-        self.bucket = bucket or settings.minio_bucket
-        self.client = Minio(
-            endpoint or settings.minio_endpoint,
-            access_key=access_key or settings.minio_root_user,
-            secret_key=secret_key or settings.minio_root_password,
-            secure=secure,
-        )
-        if not self.client.bucket_exists(self.bucket):
-            self.client.make_bucket(self.bucket)
-
-    # ------------------------------------------------------------------
-    # Écriture
-    # ------------------------------------------------------------------
-    def put_bytes(self, key: str, data: bytes, content_type: str) -> None:
-        self.client.put_object(
-            self.bucket,
-            key,
-            io.BytesIO(data),
-            length=len(data),
-            content_type=content_type,
-        )
-
-    def put_json(self, key: str, payload: dict | list) -> None:
-        data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-        self.put_bytes(key, data, "application/json")
-
-    def put_csv(self, key: str, df: pd.DataFrame) -> None:
-        self.put_bytes(key, df.to_csv(index=False).encode("utf-8"), "text/csv")
-
-    # ------------------------------------------------------------------
-    # Lecture / existence
-    # ------------------------------------------------------------------
-    def exists(self, key: str) -> bool:
-        try:
-            self.client.stat_object(self.bucket, key)
             return True
         except Exception:
             return False
@@ -245,23 +216,13 @@ class Storage:
         return sorted(obj.object_name for obj in objects)
 
 
+# Alias rétrocompatible utilisé par P1
+Storage = MinIOStorage
+
+
 def get_storage(use_local: bool = False, settings: Settings | None = None) -> MinIOStorage | LocalBronzeStorage:
     """Retourne un client MinIO (ou un stockage local si use_local=True)."""
     if use_local:
         cfg = settings or get_settings()
         return LocalBronzeStorage(base_dir=cfg.local_data_dir)
     return MinIOStorage(settings=settings)
-    def read_bytes(self, key: str) -> bytes:
-        resp = self.client.get_object(self.bucket, key)
-        try:
-            return resp.read()
-        finally:
-            resp.close()
-            resp.release_conn()
-
-    def read_csv(self, key: str) -> pd.DataFrame:
-        return pd.read_csv(io.BytesIO(self.read_bytes(key)))
-
-    def list(self, prefix: str = "") -> Iterable[str]:
-        for obj in self.client.list_objects(self.bucket, prefix=prefix, recursive=True):
-            yield obj.object_name

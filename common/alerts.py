@@ -68,32 +68,14 @@ def emit_alert(
             logger.warning("Impossible d'écrire l'alerte dans ClickHouse : %s", exc)
 
     return alert_record
-from datetime import datetime, timezone
-
-import pandas as pd
-
-from .warehouse import Warehouse
 
 
 def write_alert(
     level: str,
     source: str,
     message: str,
-    warehouse: Warehouse | None = None,
-) -> None:
-    """Insère une alerte dans ClickHouse.
-
-    level : INFO, WARNING ou CRITICAL.
-    """
-    wh = warehouse or Warehouse()
-    df = pd.DataFrame(
-        [
-            {
-                "ts": datetime.now(timezone.utc),
-                "level": level.upper(),
-                "source": source,
-                "message": message,
-            }
-        ]
-    )
-    wh.insert_df("pipeline_alertes", df)
+    warehouse: ClickHouseWarehouse | None = None,
+) -> dict[str, Any]:
+    """Alias rétrocompatible P1 autour de `emit_alert`."""
+    wh = warehouse or ClickHouseWarehouse()
+    return emit_alert(pipeline=source, niveau=level, message=message, warehouse=wh)

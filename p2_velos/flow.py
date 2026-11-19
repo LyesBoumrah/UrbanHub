@@ -1,14 +1,16 @@
-"""P2 — Flow Prefect streaming (collecte automatique toutes les 2-3 minutes).
+"""P2 — Orchestrateur streaming (collecte automatique toutes les 2-3 minutes).
 
-Orchestration complète :
-1. Collecte CityBikes -> bronze (MinIO ou disque local)
+Orchestration complète en Python pur (sans dépendance Prefect) :
+1. Collecte CityBikes parallélisée -> Bronze MinIO (partitionnée par jour dt=YYYY-MM-DD/)
 2. Nettoyage + règles qualité pures -> séparation velo_station / velo_releve
-3. Chargement silver (ClickHouse ou Parquet local)
-4. Alerting automatique (taux de rejet, réseau indisponible, stations critiques)
+3. Écriture Silver Parquet dans MinIO (silver/velos/dt=YYYY-MM-DD/...)
+4. Chargement de l'entrepôt ClickHouse strictement depuis les Parquet Silver
+5. Alerting automatique (taux de rejet, réseau indisponible, stations critiques)
 
 Utilisation :
-- Exécution unique (test / cron) : python -m p2_velos.flow --once [--local] [--cities paris lyon]
-- Streaming continu Prefect (toutes les 2m30 = 150 s) : python -m p2_velos.flow --serve --interval 150
+- Streaming continu (toutes les 3 min = 180 s) : python -m p2_velos.flow --interval 180
+- Exécution unique (test / cron) :               python -m p2_velos.flow --once [--local] [--cities paris lyon]
+- Backfill historique 5 ans :                    python -m p2_velos.flow --backfill --years 5
 
 Responsable : P2.
 """
@@ -16,6 +18,7 @@ Responsable : P2.
 from __future__ import annotations
 
 import argparse
+import signal
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -37,29 +40,10 @@ from p2_velos.ingestion import IngestionResult, ingest_all_cities
 
 logger = get_logger(__name__)
 
-# Décorateurs Prefect avec fallback no-op si Prefect n'est pas installé dans l'environnement de test
-try:
-    from prefect import flow, task
-except ImportError:  # pragma: no cover
-
-    def flow(*args: Any, **kwargs: Any) -> Any:  # type: ignore[misc]
-        def _decorator(fn: Any) -> Any:
-            return fn
-
-        return _decorator
-
-    def task(*args: Any, **kwargs: Any) -> Any:  # type: ignore[misc]
-        def _decorator(fn: Any) -> Any:
-            return fn
-
-        return _decorator
-
-
 HIGH_REJECTION_RATE_THRESHOLD = 0.10
 CRITICAL_CITY_RATIO_THRESHOLD = 0.25
 
 
-@task(name="p2-collect-bronze", retries=2, retry_delay_seconds=10)
 def collect_bronze_task(
     cities: list[str] | None = None,
     core_only: bool = False,
@@ -73,7 +57,6 @@ def collect_bronze_task(
     )
 
 
-@task(name="p2-clean-and-validate")
 def clean_and_validate_task(
     ingestion_results: list[IngestionResult],
     max_age_minutes: int | None = 30,
@@ -138,7 +121,6 @@ def clean_and_validate_task(
     }
 
 
-@task(name="p2-write-silver-parquet")
 def write_silver_parquet_task(
     cleaned_batch: dict[str, Any],
     use_local: bool = False,
@@ -175,18 +157,17 @@ def write_silver_parquet_task(
     }
 
 
-@task(name="p2-load-warehouse-from-silver")
 def load_warehouse_from_silver_task(
     silver_ref: dict[str, Any],
     use_local: bool = False,
 ) -> dict[str, Any]:
     """Charge l'entrepôt ClickHouse strictement depuis les fichiers Parquet de la couche silver."""
-    if use_local:
+    if use_local or not silver_ref.get("releve_key"):
         return {
-            "backend": "local_only",
-            "silver_parquet_key": silver_ref["releve_key"],
-            "inserted_stations": silver_ref["stations_count"],
-            "inserted_releves": silver_ref["releves_count"],
+            "backend": "local_only" if use_local else "skipped_empty",
+            "silver_parquet_key": silver_ref.get("releve_key"),
+            "inserted_stations": silver_ref["stations_count"] if use_local else 0,
+            "inserted_releves": silver_ref["releves_count"] if use_local else 0,
         }
 
     storage = get_storage(use_local=False)
@@ -205,7 +186,6 @@ def load_warehouse_from_silver_task(
     }
 
 
-@task(name="p2-emit-alerts")
 def emit_alerts_task(
     city_summaries: list[dict[str, Any]],
     use_local: bool = False,
@@ -269,14 +249,13 @@ def emit_alerts_task(
     return alerts_count
 
 
-@flow(name="p2-velos-streaming", log_prints=True)
 def velos_streaming_flow(
     cities: list[str] | None = None,
     core_only: bool = False,
     use_local: bool = False,
     max_age_minutes: int | None = 30,
 ) -> dict[str, Any]:
-    """Flow principal P2 : Bronze -> Nettoyage -> Silver Parquet -> ClickHouse -> Alertes."""
+    """Pipeline principal P2 : Bronze -> Nettoyage -> Silver Parquet -> ClickHouse -> Alertes."""
     ingestion_results = collect_bronze_task(cities=cities, core_only=core_only, use_local=use_local)
     cleaned_batch = clean_and_validate_task(ingestion_results, max_age_minutes=max_age_minutes)
     silver_ref = write_silver_parquet_task(cleaned_batch, use_local=use_local)
@@ -294,7 +273,6 @@ def velos_streaming_flow(
     return summary
 
 
-@flow(name="p2-velos-backfill-5y", log_prints=True)
 def velos_backfill_flow(
     years: int = DEFAULT_HISTORY_YEARS,
     cities: list[str] | None = None,
@@ -304,7 +282,7 @@ def velos_backfill_flow(
     max_months_per_city: int | None = None,
     max_workers: int = 5,
 ) -> dict[str, Any]:
-    """Flow Prefect de backfill historique sur 5 ans parallélisé par année."""
+    """Pipeline de backfill historique sur 5 ans parallélisé par année."""
     return run_backfill(
         years=years,
         cities=cities,
@@ -317,16 +295,30 @@ def velos_backfill_flow(
 
 
 def run_loop(
-    interval_seconds: int = 150,
+    interval_seconds: int = 180,
     cities: list[str] | None = None,
     core_only: bool = False,
     use_local: bool = False,
     max_cycles: int | None = None,
 ) -> None:
-    """Boucle locale de secours (sans serveur Prefect) exécutant la collecte toutes les 2-3 min."""
+    """Boucle streaming Python exécutant la collecte toutes les 2-3 minutes."""
+    stop_requested = False
+
+    def _handle_signal(signum: int, frame: Any) -> None:
+        del signum, frame
+        nonlocal stop_requested
+        stop_requested = True
+        logger.info("Arrêt demandé, fin après le cycle en cours...")
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, _handle_signal)
+        except (ValueError, OSError):
+            pass
+
     cycle = 0
-    logger.info("Démarrage boucle streaming P2 (intervalle = %d s)", interval_seconds)
-    while max_cycles is None or cycle < max_cycles:
+    logger.info("Démarrage worker streaming P2 (intervalle = %d s)", interval_seconds)
+    while not stop_requested and (max_cycles is None or cycle < max_cycles):
         cycle += 1
         started = time.monotonic()
         try:
@@ -334,24 +326,26 @@ def run_loop(
         except Exception as exc:
             logger.exception("Erreur non interceptée sur le cycle %d : %s", cycle, exc)
 
-        if max_cycles is not None and cycle >= max_cycles:
+        if stop_requested or (max_cycles is not None and cycle >= max_cycles):
             break
         elapsed = time.monotonic() - started
         sleep_for = max(1.0, interval_seconds - elapsed)
         logger.info("Attente %.1f s avant le prochain cycle...", sleep_for)
-        time.sleep(sleep_for)
+        deadline = time.monotonic() + sleep_for
+        while not stop_requested and time.monotonic() < deadline:
+            time.sleep(min(1.0, max(0.0, deadline - time.monotonic())))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="P2 — Flow streaming mobilité urbaine (CityBikes)")
+    parser = argparse.ArgumentParser(description="P2 — Pipeline streaming mobilité urbaine (CityBikes)")
     parser.add_argument("--cities", nargs="*", help="Filtrer sur certains ville_id")
     parser.add_argument("--core-only", action="store_true", help="Limiter aux 5 villes cœur UrbanHub")
     parser.add_argument("--local", action="store_true", help="Mode local (data/ bronze + silver Parquet)")
     parser.add_argument(
         "--interval",
         type=int,
-        default=150,
-        help="Intervalle de collecte en secondes (défaut: 150 s = 2 min 30)",
+        default=180,
+        help="Intervalle de collecte en secondes (défaut: 180 s = 3 min, <= 240 req/h sur 12 villes)",
     )
     parser.add_argument("--once", action="store_true", help="Exécuter un seul cycle puis quitter")
     parser.add_argument(
@@ -378,15 +372,10 @@ def main() -> None:
         help="Nombre de threads parallèles par année pour --backfill (défaut: 5)",
     )
     parser.add_argument(
-        "--serve",
-        action="store_true",
-        help="Enregistrer et servir le déploiement planifié sur Prefect 3",
-    )
-    parser.add_argument(
         "--max-cycles",
         type=int,
         default=None,
-        help="Nombre maximal de cycles en mode boucle locale (défaut: infini)",
+        help="Nombre maximal de cycles en mode boucle (défaut: infini)",
     )
     args = parser.parse_args()
 
@@ -401,16 +390,6 @@ def main() -> None:
         )
     elif args.once:
         velos_streaming_flow(cities=args.cities, core_only=args.core_only, use_local=args.local)
-    elif args.serve:
-        velos_streaming_flow.serve(
-            name="p2-velos-every-2m30",
-            interval=args.interval,
-            parameters={
-                "cities": args.cities,
-                "core_only": args.core_only,
-                "use_local": args.local,
-            },
-        )
     else:
         run_loop(
             interval_seconds=args.interval,

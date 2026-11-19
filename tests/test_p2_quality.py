@@ -28,6 +28,7 @@ from p2_velos.cleaning import (
     parse_historical_bronze_key,
     replay_bronze_to_silver,
 )
+from p2_velos.ingestion import build_bronze_key
 from p2_velos.quality import (
     classify_station_status,
     filter_and_audit_records,
@@ -258,7 +259,7 @@ def test_clean_bronze_payload_end_to_end():
 
 def test_local_bronze_storage_and_alerts(tmp_path: Path):
     storage = LocalBronzeStorage(base_dir=tmp_path)
-    key = "bronze/velos/paris/dt=2026-11-19/hr=11/velib_20261119T113000Z.json"
+    key = "bronze/velos/paris/dt=2026-11-19/velib_20261119T113000Z.json"
     storage.put_json(key, {"ok": True})
     assert storage.exists(key)
     assert storage.get_json(key) == {"ok": True}
@@ -323,7 +324,7 @@ def test_parse_historical_bronze_key_and_replay(tmp_path: Path):
     # Test du rejeu streaming sur une archive ancienne (> 30 min -> acceptée en rejeu)
     storage = LocalBronzeStorage(base_dir=tmp_path)
     storage.put_json(
-        "bronze/velos/paris/dt=2025-01-10/hr=08/velib_20250110T080000Z.json",
+        "bronze/velos/paris/dt=2025-01-10/velib_20250110T080000Z.json",
         {
             "meta": {"ville_id": "paris", "network_id": "velib"},
             "payload": {
@@ -356,8 +357,11 @@ def test_parse_historical_bronze_key_and_replay(tmp_path: Path):
     assert summary["streaming_silver_rows"] == 1
     assert summary["errors"] == []
 
+    assert build_bronze_key("paris", "velib", REF_NOW) == (
+        "bronze/velos/paris/dt=2026-11-19/velib_20261119T113000Z.json"
+    )
     assert build_silver_streaming_key(REF_NOW) == (
-        "silver/velos/dt=2026-11-19/hr=11/velo_releve_20261119T113000Z.parquet"
+        "silver/velos/dt=2026-11-19/velo_releve_20261119T113000Z.parquet"
     )
     assert build_silver_historical_key("paris", 2025, "202506") == (
         "silver/velos_historique/paris/2025/velo_releve_202506.parquet"

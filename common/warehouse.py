@@ -1,5 +1,6 @@
 """Client de l'entrepôt (ClickHouse) : insert_df, insert_rows, query_df, execute.
 
+Inclut l'alias `Warehouse` pour rétrocompatibilité P1.
 Responsable : commun.
 """
 
@@ -17,8 +18,20 @@ logger = get_logger(__name__)
 class ClickHouseWarehouse:
     """Wrapper ClickHouse utilisant clickhouse-connect (import paresseux)."""
 
-    def __init__(self, settings: Settings | None = None, database: str | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        database: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        user: str | None = None,
+        password: str | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
+        self._host = host or self.settings.clickhouse_host
+        self._port = port if port is not None else self.settings.clickhouse_port
+        self._user = user or self.settings.clickhouse_user
+        self._password = password or self.settings.clickhouse_password
         self.database = database if database is not None else self.settings.clickhouse_db
         self._client: Any = None
 
@@ -28,10 +41,10 @@ class ClickHouseWarehouse:
             import clickhouse_connect
 
             kwargs: dict[str, Any] = {
-                "host": self.settings.clickhouse_host,
-                "port": self.settings.clickhouse_port,
-                "username": self.settings.clickhouse_user,
-                "password": self.settings.clickhouse_password,
+                "host": self._host,
+                "port": self._port,
+                "username": self._user,
+                "password": self._password,
             }
             if self.database:
                 kwargs["database"] = self.database
@@ -48,6 +61,8 @@ class ClickHouseWarehouse:
 
     def execute(self, sql: str, parameters: dict[str, Any] | None = None) -> Any:
         return self.client.command(sql, parameters=parameters)
+
+    command = execute
 
     def insert_df(self, table: str, df: Any) -> int:
         if df is None or len(df) == 0:
@@ -83,7 +98,14 @@ class ClickHouseWarehouse:
             return pd.DataFrame()
 
         def _run_year(year: int) -> Any:
-            worker_wh = ClickHouseWarehouse(settings=self.settings, database=self.database)
+            worker_wh = ClickHouseWarehouse(
+                settings=self.settings,
+                database=self.database,
+                host=self._host,
+                port=self._port,
+                user=self._user,
+                password=self._password,
+            )
             return worker_wh.query_df(sql_template.format(year=year))
 
         workers = max(1, min(int(max_workers), len(unique_years)))
@@ -100,45 +122,10 @@ class ClickHouseWarehouse:
         return pd.concat(ordered, ignore_index=True) if ordered else pd.DataFrame()
 
 
+# Alias rétrocompatible utilisé par P1
+Warehouse = ClickHouseWarehouse
+
+
 def get_warehouse(settings: Settings | None = None, database: str | None = None) -> ClickHouseWarehouse:
     """Fabrique un client ClickHouseWarehouse."""
     return ClickHouseWarehouse(settings=settings, database=database)
-import pandas as pd
-import clickhouse_connect
-
-from .config import settings
-from .log import setup_logging
-
-log = setup_logging(__name__)
-
-
-class Warehouse:
-    """Encapsule la connexion ClickHouse et les opérations courantes."""
-
-    def __init__(
-        self,
-        host: str | None = None,
-        port: int | None = None,
-        user: str | None = None,
-        password: str | None = None,
-        database: str | None = None,
-    ) -> None:
-        self.client = clickhouse_connect.get_client(
-            host=host or settings.clickhouse_host,
-            port=port or settings.clickhouse_port,
-            username=user or settings.clickhouse_user,
-            password=password or settings.clickhouse_password,
-            database=database or settings.clickhouse_db,
-        )
-
-    def command(self, sql: str) -> None:
-        self.client.command(sql)
-
-    def query_df(self, sql: str, parameters: dict | None = None) -> pd.DataFrame:
-        return self.client.query_df(sql, parameters=parameters or {})
-
-    def insert_df(self, table: str, df: pd.DataFrame) -> None:
-        if df.empty:
-            log.warning("insert_df(%s) : DataFrame vide, rien à insérer", table)
-            return
-        self.client.insert_df(table, df)
