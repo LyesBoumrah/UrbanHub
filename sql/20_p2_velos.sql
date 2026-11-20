@@ -1,11 +1,8 @@
--- 20_p2_velos : tables silver velo_station, velo_releve et vues métier P2
+-- 20_p2_velos : tables Silver Lakehouse velo_station, velo_releve et vues métier P2 (Q1 à Q5)
 -- Responsable : P2.
 
 CREATE DATABASE IF NOT EXISTS urbanhub;
 
--- ============================================================================
--- 1. Table dimension : référentiel des stations de vélos (dernier état connu)
--- ============================================================================
 CREATE TABLE IF NOT EXISTS urbanhub.velo_station (
     ville_id        LowCardinality(String),
     network_id      LowCardinality(String),
@@ -20,11 +17,6 @@ CREATE TABLE IF NOT EXISTS urbanhub.velo_station (
 ENGINE = ReplacingMergeTree(updated_at_utc)
 ORDER BY (ville_id, station_id);
 
--- ============================================================================
--- 2. Table de faits streaming : relevés stations toutes les 2-3 minutes
---    Inclut les 7 variables demandées :
---    station_id, station_name, latitude, longitude, bikes_available, free_slots, timestamp
--- ============================================================================
 CREATE TABLE IF NOT EXISTS urbanhub.velo_releve (
     ville_id          LowCardinality(String),
     network_id        LowCardinality(String),
@@ -48,11 +40,7 @@ ENGINE = ReplacingMergeTree(ingested_at_utc)
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (ville_id, station_id, timestamp);
 
--- ============================================================================
--- 3. Vues analytiques répondant aux 5 questions métier P2
--- ============================================================================
-
--- Q1 : Quelles stations présentent le plus fort taux d'utilisation ?
+-- Q1 : Stations au plus fort taux d'utilisation
 CREATE OR REPLACE VIEW urbanhub.v_velo_utilisation_stations AS
 SELECT
     ville_id,
@@ -62,46 +50,45 @@ SELECT
     anyLast(latitude) AS latitude,
     anyLast(longitude) AS longitude,
     round(avg(capacity), 1) AS capacite_moyenne,
-    round(avg(taux_utilisation), 4) AS taux_utilisation_moyen,
-    round(avg(taux_occupation), 4) AS taux_occupation_moyen,
+    round(avg(taux_utilisation) * 100.0, 1) AS taux_utilisation_pct,
+    round(avg(taux_occupation) * 100.0, 1) AS taux_occupation_pct,
     round(stddevPop(bikes_available), 2) AS volatilite_velos,
     max(bikes_available) - min(bikes_available) AS amplitude_velos,
     count() AS nb_releves
-FROM urbanhub.velo_releve
+FROM urbanhub.velo_releve FINAL
 GROUP BY ville_id, network_id, station_id;
 
--- Q2 : Zones où l'offre de vélos est insuffisante (grille spatiale ~110 m + pénurie)
+-- Q2 : Zones où l'offre de vélos est insuffisante
 CREATE OR REPLACE VIEW urbanhub.v_velo_zones_sous_offre AS
 SELECT
     ville_id,
-    round(latitude, 3) AS zone_lat,
-    round(longitude, 3) AS zone_lon,
+    round(latitude, 2) AS zone_lat,
+    round(longitude, 2) AS zone_lon,
     uniqExact(station_id) AS nb_stations,
-    round(avg(capacity), 1) AS capacite_moyenne_station,
     round(avg(bikes_available), 2) AS velos_dispo_moyens,
-    round(avg(taux_occupation), 4) AS taux_occupation_moyen,
-    round(countIf(est_vide = 1) / count(), 4) AS pct_temps_vide,
-    round(countIf(taux_occupation <= 0.15) / count(), 4) AS pct_temps_sous_offre,
+    round(avg(taux_occupation) * 100.0, 1) AS taux_occupation_pct,
+    round(countIf(est_vide = 1) / count() * 100.0, 1) AS pct_temps_vide,
+    round(countIf(taux_occupation <= 0.15) / count() * 100.0, 1) AS pct_temps_sous_offre,
     count() AS nb_releves
-FROM urbanhub.velo_releve
+FROM urbanhub.velo_releve FINAL
 GROUP BY ville_id, zone_lat, zone_lon;
 
--- Q3 : Pics d'utilisation journaliers du réseau (heure locale Europe/Paris, semaine vs week-end)
-CREATE OR REPLACE VIEW urbanhub.v_velo_pics_horaires AS
+-- Q3 : Pics d'utilisation journaliers (0h–23h heure locale, Semaine vs Week-end)
+CREATE OR REPLACE VIEW urbanhub.v_velo_pics_journaliers AS
 SELECT
     ville_id,
     toHour(toTimezone(timestamp, 'Europe/Paris')) AS heure_locale,
-    if(toDayOfWeek(toTimezone(timestamp, 'Europe/Paris')) IN (6, 7), 'weekend', 'semaine') AS type_jour,
-    round(avg(taux_utilisation), 4) AS taux_utilisation_moyen,
-    round(avg(taux_occupation), 4) AS taux_occupation_moyen,
+    if(toDayOfWeek(toTimezone(timestamp, 'Europe/Paris')) IN (6, 7), 'Week-end', 'Semaine') AS type_jour,
+    round(avg(taux_utilisation) * 100.0, 1) AS taux_utilisation_pct,
+    round(avg(taux_occupation) * 100.0, 1) AS taux_occupation_pct,
     round(avg(bikes_available), 2) AS velos_dispo_moyens,
-    round(countIf(est_vide = 1) / count(), 4) AS pct_stations_vides,
-    round(countIf(est_pleine = 1) / count(), 4) AS pct_stations_pleines,
+    round(countIf(est_vide = 1) / count() * 100.0, 1) AS pct_stations_vides,
+    round(countIf(est_pleine = 1) / count() * 100.0, 1) AS pct_stations_pleines,
     count() AS nb_releves
-FROM urbanhub.velo_releve
+FROM urbanhub.velo_releve FINAL
 GROUP BY ville_id, heure_locale, type_jour;
 
--- Q4 : Déséquilibres géographiques par secteur (Centre / NE / NO / SE / SO par rapport au centre-ville)
+-- Q4 : Déséquilibres géographiques par secteur (Centre vs quadrants N/S/E/O)
 CREATE OR REPLACE VIEW urbanhub.v_velo_desequilibre_geo AS
 SELECT
     r.ville_id AS ville_id,
@@ -113,16 +100,16 @@ SELECT
         'Sud-Ouest'
     ) AS secteur_geo,
     uniqExact(r.station_id) AS nb_stations,
-    round(avg(r.taux_occupation), 4) AS taux_occupation_moyen,
-    round(avg(r.taux_utilisation), 4) AS taux_utilisation_moyen,
-    round(countIf(r.est_vide = 1) / count(), 4) AS pct_temps_vide,
-    round(countIf(r.est_pleine = 1) / count(), 4) AS pct_temps_pleine,
+    round(avg(r.taux_occupation) * 100.0, 1) AS taux_occupation_pct,
+    round(avg(r.taux_utilisation) * 100.0, 1) AS taux_utilisation_pct,
+    round(countIf(r.est_vide = 1) / count() * 100.0, 1) AS pct_temps_vide,
+    round(countIf(r.est_pleine = 1) / count() * 100.0, 1) AS pct_temps_pleine,
     round(avg(geoDistance(r.longitude, r.latitude, v.longitude, v.latitude)) / 1000.0, 2) AS distance_centre_km
-FROM urbanhub.velo_releve AS r
-LEFT JOIN urbanhub.ref_ville AS v ON r.ville_id = v.ville_id
+FROM urbanhub.velo_releve AS r FINAL
+LEFT JOIN urbanhub.ref_ville AS v FINAL ON r.ville_id = v.ville_id
 GROUP BY r.ville_id, secteur_geo;
 
--- Q5 : Détection des stations critiques nécessitant un rééquilibrage (dernier état + persistance)
+-- Q5 : Stations critiques nécessitant un rééquilibrage
 CREATE OR REPLACE VIEW urbanhub.v_velo_stations_critiques AS
 SELECT
     ville_id,
@@ -135,8 +122,8 @@ SELECT
     bikes_available,
     free_slots,
     capacity,
-    round(dernier_taux_occupation, 4) AS dernier_taux_occupation,
-    pct_temps_critique,
+    round(dernier_taux_occupation * 100.0, 1) AS taux_occupation_pct,
+    round(pct_temps_critique * 100.0, 1) AS pct_temps_critique,
     multiIf(
         dernier_taux_occupation <= 0.10, 'REAPPROVISIONNER',
         dernier_taux_occupation >= 0.90, 'DESENGORGER',
@@ -156,14 +143,13 @@ FROM (
         argMax(free_slots, timestamp) AS free_slots,
         argMax(capacity, timestamp) AS capacity,
         argMax(taux_occupation, timestamp) AS dernier_taux_occupation,
-        round(countIf(est_critique = 1) / count(), 4) AS pct_temps_critique
-    FROM urbanhub.velo_releve
+        countIf(est_critique = 1) / count() AS pct_temps_critique
+    FROM urbanhub.velo_releve FINAL
     GROUP BY ville_id, network_id, station_id
-);
+)
+WHERE action_reequilibrage != 'AUCUNE';
 
--- ============================================================================
--- 4. Vue agrégée ville x heure_utc (pour jointure P4 gold_ville_heure)
--- ============================================================================
+-- Agrégat ville × heure_utc pour la jointure Gold P4
 CREATE OR REPLACE VIEW urbanhub.v_velo_ville_heure AS
 SELECT
     ville_id,
@@ -177,21 +163,5 @@ SELECT
     round(countIf(est_pleine = 1) / count(), 4) AS pct_stations_pleines,
     round(countIf(est_critique = 1) / count(), 4) AS pct_stations_critiques,
     count() AS nb_releves
-FROM urbanhub.velo_releve
+FROM urbanhub.velo_releve FINAL
 GROUP BY ville_id, heure_utc;
-
--- ============================================================================
--- 5. Vue tendance mensuelle multi-annuelle (fenêtre jusqu'à 5 ans)
--- ============================================================================
-CREATE OR REPLACE VIEW urbanhub.v_velo_tendance_mensuelle AS
-SELECT
-    ville_id,
-    toStartOfMonth(timestamp) AS mois_utc,
-    uniqExact(station_id) AS nb_stations_actives,
-    round(avg(bikes_available), 2) AS velos_dispo_moyens,
-    round(avg(taux_utilisation), 4) AS taux_utilisation_moyen,
-    round(avg(taux_occupation), 4) AS taux_occupation_moyen,
-    round(countIf(est_critique = 1) / count(), 4) AS pct_stations_critiques,
-    count() AS nb_releves
-FROM urbanhub.velo_releve
-GROUP BY ville_id, mois_utc;

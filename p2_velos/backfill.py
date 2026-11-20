@@ -10,7 +10,7 @@ p2_velos.cleaning.clean_historical_parquet (clé de jointure (ville_id, heure_ut
 Parallélisation :
 - Listage concurrent des répertoires annuels (`/{year}/`) via ThreadPoolExecutor.
 - Téléchargement, nettoyage et chargement silver exécutés en parallèle par année
-  (un thread, une session HTTP et un client ClickHouse dédiés par année -> thread-safe).
+  (un thread, une session HTTP et un client stockage dédiés par année -> thread-safe).
 
 Attribution requise (ODbL v1.0) :
 "Bike-share data by CityBikes contributors and available from https://data.citybik.es."
@@ -30,12 +30,11 @@ from typing import Any, Mapping, Sequence
 
 from common.config import get_settings, load_ref_ville
 from common.log import get_logger
+from common.period import DEFAULT_FETCH_DURATION, add_duration_arguments, compute_window, months_span
 from common.storage import LocalBronzeStorage, MinIOStorage, get_storage
-from common.warehouse import ClickHouseWarehouse, get_warehouse
 from p2_velos.cleaning import (
     build_silver_historical_key,
     clean_historical_parquet,
-    load_warehouse_from_silver_parquet,
     save_silver_parquet_to_storage,
 )
 
@@ -230,11 +229,12 @@ def backfill_single_dump(
     bbox: Mapping[str, float] | None = None,
     freq: str | None = "1h",
     use_local: bool = False,
-    warehouse: ClickHouseWarehouse | None = None,
     skip_existing_bronze: bool = True,
     session: Any = None,
+    min_timestamp: datetime | None = None,
+    max_timestamp: datetime | None = None,
 ) -> dict[str, Any]:
-    """Télécharge, archive en bronze, nettoie (via cleaning.py) et charge en silver un dump mensuel."""
+    """Télécharge, archive en bronze, nettoie (via cleaning.py) et écrit en silver Parquet un dump mensuel."""
     from p2_velos.ingestion import build_http_session
 
     bronze_key = f"bronze/velos_historique/{dump.ville_id}/{dump.year}/{dump.filename}"
@@ -265,6 +265,18 @@ def backfill_single_dump(
         freq=freq,
     )
 
+    if not df_releves.empty and (min_timestamp is not None or max_timestamp is not None):
+        import pandas as pd
+
+        ts_col = pd.to_datetime(df_releves["timestamp"], utc=True)
+        mask = pd.Series(True, index=df_releves.index)
+        if min_timestamp is not None:
+            mask &= ts_col >= pd.Timestamp(min_timestamp)
+        if max_timestamp is not None:
+            mask &= ts_col <= pd.Timestamp(max_timestamp)
+        df_releves = df_releves.loc[mask].reset_index(drop=True)
+        stats["resampled_count"] = len(df_releves)
+
     silver_key: str | None = None
     if use_local:
         out_dir = Path(get_settings().local_data_dir) / "silver" / "velos_historique" / dump.ville_id
@@ -291,20 +303,31 @@ def backfill_single_dump(
             releve_key=build_silver_historical_key(dump.ville_id, dump.year, dump.ym),
             station_key=hist_station_key,
         )
-        wh = warehouse or get_warehouse()
-        ins_st, ins_rel = load_warehouse_from_silver_parquet(
-            storage=storage,
-            warehouse=wh,
-            releve_key=silver_key,
-            station_key=hist_station_key,
-        )
+        try:
+            from common.warehouse import try_get_warehouse
+            from p2_velos.cleaning import RELEVE_COLUMNS, STATION_COLUMNS
+
+            wh = try_get_warehouse()
+            if wh is not None:
+                if not df_stations.empty:
+                    wh.insert_df("urbanhub.velo_station", df_stations[STATION_COLUMNS])
+                if not df_releves.empty:
+                    wh.insert_df("urbanhub.velo_releve", df_releves[RELEVE_COLUMNS])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[%d][%s][%s] Synchronisation ClickHouse ignorée : %s",
+                dump.year,
+                dump.ville_id,
+                dump.ym,
+                exc,
+            )
         logger.info(
-            "[%d][%s][%s] Silver Parquet -> ClickHouse : %d stations, %d relevés (%s, rejets: %.1f %%)",
+            "[%d][%s][%s] Bronze -> Silver Parquet : %d stations, %d relevés (%s, rejets: %.1f %%)",
             dump.year,
             dump.ville_id,
             dump.ym,
-            ins_st,
-            ins_rel,
+            len(df_stations),
+            len(df_releves),
             freq or "brut",
             stats["rejection_rate"] * 100.0,
         )
@@ -326,12 +349,13 @@ def _process_year_batch(
     freq: str | None,
     use_local: bool,
     skip_existing_bronze: bool,
+    min_timestamp: datetime | None = None,
+    max_timestamp: datetime | None = None,
 ) -> dict[str, Any]:
-    """Worker dédié à une année (session HTTP, stockage et client ClickHouse isolés par thread)."""
+    """Worker dédié à une année (session HTTP et stockage isolés par thread)."""
     from p2_velos.ingestion import build_http_session
 
     storage = get_storage(use_local=use_local)
-    warehouse = None if use_local else get_warehouse()
     session = build_http_session()
 
     results: list[dict[str, Any]] = []
@@ -346,9 +370,10 @@ def _process_year_batch(
                 bbox=bbox_map.get(dump.ville_id),
                 freq=freq,
                 use_local=use_local,
-                warehouse=warehouse,
                 skip_existing_bronze=skip_existing_bronze,
                 session=session,
+                min_timestamp=min_timestamp,
+                max_timestamp=max_timestamp,
             )
             results.append(res)
         except Exception as exc:
@@ -378,14 +403,45 @@ def run_backfill(
     skip_existing_bronze: bool = True,
     max_months_per_city: int | None = None,
     max_workers: int = DEFAULT_MAX_WORKERS,
+    *,
+    days: int | None = None,
+    weeks: int | None = None,
+    months: int | None = None,
+    duration: str | None = None,
 ) -> dict[str, Any]:
-    """Lance le backfill historique sur 5 ans en parallèle par année."""
-    dumps = list_available_dumps(
+    """Lance le backfill historique en parallèle sur la durée demandée (jours, semaines, mois, années)."""
+    has_custom = any(v is not None for v in (days, weeks, months, duration))
+    effective_years = years
+    req_start_utc: datetime | None = None
+    req_end_utc: datetime | None = None
+    req_start_ym: str | None = None
+    req_end_ym: str | None = None
+    if has_custom:
+        req_start_utc, req_end_utc = compute_window(
+            days=days,
+            weeks=weeks,
+            months=months,
+            years=None,
+            duration=duration,
+            default_years=years,
+        )
+        span_m = months_span(req_start_utc, req_end_utc)
+        effective_years = max(1, (span_m + 11) // 12)
+        req_start_ym = f"{req_start_utc.year:04d}{req_start_utc.month:02d}"
+        req_end_ym = f"{req_end_utc.year:04d}{req_end_utc.month:02d}"
+
+    all_available_dumps = list_available_dumps(
         cities=cities,
         core_only=core_only,
-        years=years,
+        years=effective_years,
         max_workers=max_workers,
     )
+    latest_available_ym = max((d.ym for d in all_available_dumps), default=None)
+    dumps = all_available_dumps
+
+    if req_start_ym and req_end_ym:
+        dumps = [d for d in dumps if req_start_ym <= d.ym <= req_end_ym]
+
     if max_months_per_city is not None and max_months_per_city > 0:
         grouped_city: dict[str, list[HistoricalDump]] = {}
         for d in dumps:
@@ -419,6 +475,8 @@ def run_backfill(
                     freq,
                     use_local,
                     skip_existing_bronze,
+                    req_start_utc,
+                    req_end_utc,
                 ): year
                 for year, year_dumps in dumps_by_year.items()
             }
@@ -435,6 +493,9 @@ def run_backfill(
 
     summary = {
         "years_requested": years,
+        "requested_start_utc": req_start_utc.isoformat() if req_start_utc else None,
+        "requested_end_utc": req_end_utc.isoformat() if req_end_utc else None,
+        "latest_available_ym": latest_available_ym,
         "parallel_years": sorted(dumps_by_year.keys()),
         "dumps_total": len(dumps),
         "dumps_ok": len(all_results),
@@ -451,10 +512,12 @@ def run_backfill(
 
 
 def main() -> None:
+    import os
+
     parser = argparse.ArgumentParser(
-        description="P2 — Backfill historique 5 ans parallélisé par année (data.citybik.es)"
+        description="P2 — Backfill historique parallélisé par année (durée configurable : jours/semaines/mois/années)"
     )
-    parser.add_argument("--years", type=int, default=DEFAULT_HISTORY_YEARS, help="Fenêtre en années (défaut: 5)")
+    add_duration_arguments(parser, default_help_suffix=f"défaut : FETCH_DURATION ou {DEFAULT_FETCH_DURATION}")
     parser.add_argument("--cities", nargs="*", help="Liste de ville_id à récupérer (défaut: toutes)")
     parser.add_argument("--core-only", action="store_true", help="Limiter aux 5 villes cœur UrbanHub")
     parser.add_argument(
@@ -462,7 +525,7 @@ def main() -> None:
         default="1h",
         help="Granularité de rééchantillonnage pandas (défaut: 1h ; 'raw' pour conserver tous les événements)",
     )
-    parser.add_argument("--local", action="store_true", help="Écrire en bronze/silver local (data/) au lieu de Docker")
+    parser.add_argument("--local", action="store_true", help="Écrire en bronze/silver local (data/) au lieu de MinIO")
     parser.add_argument("--force", action="store_true", help="Re-télécharger même si déjà présent en bronze")
     parser.add_argument(
         "--max-months-per-city",
@@ -478,9 +541,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    has_cli = any(v is not None for v in (args.duration, args.days, args.weeks, args.months, args.years))
+    default_dur = os.getenv("FETCH_DURATION", "").strip() or DEFAULT_FETCH_DURATION
     freq_val = None if str(args.freq).lower() == "raw" else args.freq
     run_backfill(
-        years=args.years,
+        years=args.years if args.years is not None else DEFAULT_HISTORY_YEARS,
         cities=args.cities,
         core_only=args.core_only,
         freq=freq_val,
@@ -488,6 +553,10 @@ def main() -> None:
         skip_existing_bronze=not args.force,
         max_months_per_city=args.max_months_per_city,
         max_workers=args.max_workers,
+        days=args.days,
+        weeks=args.weeks,
+        months=args.months,
+        duration=args.duration if has_cli else default_dur,
     )
 
 

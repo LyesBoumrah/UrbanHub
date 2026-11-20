@@ -3,9 +3,8 @@
 Orchestration complète en Python pur (sans dépendance Prefect) :
 1. Collecte CityBikes parallélisée -> Bronze MinIO (partitionnée par jour dt=YYYY-MM-DD/)
 2. Nettoyage + règles qualité pures -> séparation velo_station / velo_releve
-3. Écriture Silver Parquet dans MinIO (silver/velos/dt=YYYY-MM-DD/...)
-4. Chargement de l'entrepôt ClickHouse strictement depuis les Parquet Silver
-5. Alerting automatique (taux de rejet, réseau indisponible, stations critiques)
+3. Écriture Silver Parquet dans MinIO (`silver/velos/dt=YYYY-MM-DD/...`)
+4. Alerting automatique (taux de rejet, réseau indisponible, stations critiques)
 
 Utilisation :
 - Streaming continu (toutes les 3 min = 180 s) : python -m p2_velos.flow --interval 180
@@ -18,6 +17,7 @@ Responsable : P2.
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import time
 from datetime import datetime, timezone
@@ -25,14 +25,16 @@ from typing import Any
 
 from common.alerts import emit_alert
 from common.log import get_logger
+from common.period import DEFAULT_FETCH_DURATION, add_duration_arguments
 from common.storage import get_storage
-from common.warehouse import ClickHouseWarehouse, get_warehouse
+from common.warehouse import try_get_warehouse
 from p2_velos.backfill import DEFAULT_HISTORY_YEARS, run_backfill
 from p2_velos.cleaning import (
+    RELEVE_COLUMNS,
+    STATION_COLUMNS,
     build_silver_streaming_key,
     clean_bronze_payload,
     get_bbox_map,
-    load_warehouse_from_silver_parquet,
     save_silver_local,
     save_silver_parquet_to_storage,
 )
@@ -148,41 +150,28 @@ def write_silver_parquet_task(
         releve_key=build_silver_streaming_key(),
         station_key=station_key,
     )
+
+    ch_rows = 0
+    wh = try_get_warehouse()
+    if wh is not None:
+        try:
+            import pandas as pd
+
+            if stations:
+                wh.insert_df("urbanhub.velo_station", pd.DataFrame(stations)[STATION_COLUMNS])
+            if releves:
+                ch_rows = wh.insert_df("urbanhub.velo_releve", pd.DataFrame(releves)[RELEVE_COLUMNS])
+            logger.info("ClickHouse Lakehouse P2 synchronisé : %d relevés velo_releve", ch_rows)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Synchronisation ClickHouse P2 ignorée : %s", exc)
+
     return {
-        "backend": "minio_silver_parquet",
+        "backend": "lakehouse_minio_clickhouse" if ch_rows > 0 else "minio_silver_parquet",
         "releve_key": releve_key,
         "station_key": station_key,
         "stations_count": len(stations),
         "releves_count": len(releves),
-    }
-
-
-def load_warehouse_from_silver_task(
-    silver_ref: dict[str, Any],
-    use_local: bool = False,
-) -> dict[str, Any]:
-    """Charge l'entrepôt ClickHouse strictement depuis les fichiers Parquet de la couche silver."""
-    if use_local or not silver_ref.get("releve_key"):
-        return {
-            "backend": "local_only" if use_local else "skipped_empty",
-            "silver_parquet_key": silver_ref.get("releve_key"),
-            "inserted_stations": silver_ref["stations_count"] if use_local else 0,
-            "inserted_releves": silver_ref["releves_count"] if use_local else 0,
-        }
-
-    storage = get_storage(use_local=False)
-    warehouse = get_warehouse()
-    inserted_stations, inserted_releves = load_warehouse_from_silver_parquet(
-        storage=storage,
-        warehouse=warehouse,
-        releve_key=silver_ref["releve_key"],
-        station_key=silver_ref["station_key"],
-    )
-    return {
-        "backend": "silver_parquet->clickhouse",
-        "silver_parquet_key": silver_ref["releve_key"],
-        "inserted_stations": inserted_stations,
-        "inserted_releves": inserted_releves,
+        "clickhouse_rows": ch_rows,
     }
 
 
@@ -191,11 +180,8 @@ def emit_alerts_task(
     use_local: bool = False,
 ) -> int:
     """Émet les alertes pipeline en cas de panne API, fort taux de rejet ou tension réseau."""
-    warehouse: ClickHouseWarehouse | None = None
-    if not use_local:
-        candidate = get_warehouse()
-        if candidate.ping():
-            warehouse = candidate
+    storage = get_storage(use_local=use_local)
+    warehouse = None if use_local else try_get_warehouse()
 
     alerts_count = 0
     for summary in city_summaries:
@@ -207,6 +193,7 @@ def emit_alerts_task(
                 message=f"Collecte CityBikes en échec pour {ville_id}",
                 ville_id=ville_id,
                 details={"network_id": summary["network_id"], "error": summary.get("error")},
+                storage=storage,
                 warehouse=warehouse,
             )
             alerts_count += 1
@@ -225,6 +212,7 @@ def emit_alerts_task(
                     "rejected_count": summary["rejected_count"],
                     "reasons": summary.get("reasons_summary", {}),
                 },
+                storage=storage,
                 warehouse=warehouse,
             )
             alerts_count += 1
@@ -242,6 +230,7 @@ def emit_alerts_task(
                     "critical_count": summary.get("critical_count", 0),
                     "valid_count": summary["valid_count"],
                 },
+                storage=storage,
                 warehouse=warehouse,
             )
             alerts_count += 1
@@ -255,18 +244,17 @@ def velos_streaming_flow(
     use_local: bool = False,
     max_age_minutes: int | None = 30,
 ) -> dict[str, Any]:
-    """Pipeline principal P2 : Bronze -> Nettoyage -> Silver Parquet -> ClickHouse -> Alertes."""
+    """Pipeline principal P2 : Bronze -> Nettoyage -> Silver Parquet -> Alertes."""
     ingestion_results = collect_bronze_task(cities=cities, core_only=core_only, use_local=use_local)
     cleaned_batch = clean_and_validate_task(ingestion_results, max_age_minutes=max_age_minutes)
     silver_ref = write_silver_parquet_task(cleaned_batch, use_local=use_local)
-    load_stats = load_warehouse_from_silver_task(silver_ref, use_local=use_local)
     alerts_count = emit_alerts_task(cleaned_batch["city_summaries"], use_local=use_local)
 
     summary = {
         "processed_at_utc": cleaned_batch["processed_at_utc"],
         "cities_total": len(ingestion_results),
         "cities_ok": sum(1 for r in ingestion_results if r.ok),
-        "load": load_stats,
+        "silver": silver_ref,
         "alerts_emitted": alerts_count,
     }
     logger.info("Cycle P2 terminé : %s", summary)
@@ -281,8 +269,13 @@ def velos_backfill_flow(
     use_local: bool = False,
     max_months_per_city: int | None = None,
     max_workers: int = 5,
+    *,
+    days: int | None = None,
+    weeks: int | None = None,
+    months: int | None = None,
+    duration: str | None = None,
 ) -> dict[str, Any]:
-    """Pipeline de backfill historique sur 5 ans parallélisé par année."""
+    """Pipeline de backfill historique parallélisé par année (durée configurable)."""
     return run_backfill(
         years=years,
         cities=cities,
@@ -291,6 +284,10 @@ def velos_backfill_flow(
         use_local=use_local,
         max_months_per_city=max_months_per_city,
         max_workers=max_workers,
+        days=days,
+        weeks=weeks,
+        months=months,
+        duration=duration,
     )
 
 
@@ -351,14 +348,9 @@ def main() -> None:
     parser.add_argument(
         "--backfill",
         action="store_true",
-        help="Lancer le backfill historique sur 5 ans depuis data.citybik.es",
+        help="Lancer le backfill historique depuis data.citybik.es (durée configurable)",
     )
-    parser.add_argument(
-        "--years",
-        type=int,
-        default=DEFAULT_HISTORY_YEARS,
-        help="Nombre d'années d'historique pour --backfill (défaut: 5)",
-    )
+    add_duration_arguments(parser, default_help_suffix=f"backfill, défaut : {DEFAULT_HISTORY_YEARS} ans")
     parser.add_argument(
         "--max-months-per-city",
         type=int,
@@ -380,13 +372,19 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.backfill:
+        has_cli = any(v is not None for v in (args.duration, args.days, args.weeks, args.months, args.years))
+        default_dur = os.getenv("FETCH_DURATION", "").strip() or DEFAULT_FETCH_DURATION
         velos_backfill_flow(
-            years=args.years,
+            years=args.years if args.years is not None else DEFAULT_HISTORY_YEARS,
             cities=args.cities,
             core_only=args.core_only,
             use_local=args.local,
             max_months_per_city=args.max_months_per_city,
             max_workers=args.max_workers,
+            days=args.days,
+            weeks=args.weeks,
+            months=args.months,
+            duration=args.duration if has_cli else default_dur,
         )
     elif args.once:
         velos_streaming_flow(cities=args.cities, core_only=args.core_only, use_local=args.local)

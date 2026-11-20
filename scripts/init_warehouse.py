@@ -1,4 +1,12 @@
-"""Applique les fichiers sql/*.sql dans l'ordre et peuple urbanhub.ref_ville depuis config/ref_ville.json.
+"""Initialise le Data Lakehouse UrbanHub : 3 buckets MinIO (`bronze`, `silver`, `gold`) + schéma ClickHouse (`sql/`).
+
+Exécute de manière idempotente :
+  1. Création des 3 buckets MinIO Medallion (`bronze`, `silver`, `gold`)
+  2. Exécution des scripts DDL ClickHouse dans l'ordre (`sql/00_commun.sql` -> `sql/40_gold.sql`)
+  3. Alimentation / mise à jour de `urbanhub.ref_ville` depuis `config/ref_ville.json`
+
+Usage :
+  python scripts/init_warehouse.py
 
 Responsable : commun.
 """
@@ -7,6 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from common.config import PROJECT_ROOT, load_ref_ville
 from common.log import get_logger
@@ -15,91 +24,90 @@ from common.warehouse import ClickHouseWarehouse, get_warehouse
 
 logger = get_logger(__name__)
 
+SQL_DIR = PROJECT_ROOT / "sql"
+
 
 def split_sql_statements(sql_text: str) -> list[str]:
-    """Découpe un fichier SQL en instructions individuelles (ignore les lignes purement commentaires)."""
-    cleaned_lines: list[str] = []
-    for line in sql_text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("--") or not stripped:
-            continue
-        cleaned_lines.append(line)
-    joined = "\n".join(cleaned_lines)
-    return [stmt.strip() for stmt in joined.split(";") if stmt.strip()]
+    """Découpe un fichier SQL en instructions individuelles (ignore commentaires `--` et blocs vides)."""
+    cleaned_lines = [line for line in sql_text.splitlines() if not line.strip().startswith("--")]
+    raw = "\n".join(cleaned_lines)
+    return [stmt.strip() for stmt in raw.split(";") if stmt.strip()]
 
 
-def seed_ref_ville(warehouse: ClickHouseWarehouse) -> int:
-    """Insère / met à jour urbanhub.ref_ville à partir de config/ref_ville.json."""
-    entries = load_ref_ville()
+def apply_sql_files(warehouse: ClickHouseWarehouse, sql_dir: Path = SQL_DIR) -> list[str]:
+    """Exécute tous les fichiers `sql/*.sql` par ordre alphabétique dans ClickHouse."""
+    executed: list[str] = []
+    for sql_file in sorted(sql_dir.glob("*.sql")):
+        statements = split_sql_statements(sql_file.read_text(encoding="utf-8"))
+        for stmt in statements:
+            warehouse.execute(stmt)
+        executed.append(sql_file.name)
+        logger.info("DDL ClickHouse appliqué : %s (%d instructions)", sql_file.name, len(statements))
+    return executed
+
+
+def seed_ref_ville(warehouse: ClickHouseWarehouse, villes: list[dict[str, Any]] | None = None) -> int:
+    """Insère ou met à jour le référentiel des 12 métropoles françaises dans `urbanhub.ref_ville`."""
+    entries = villes if villes is not None else load_ref_ville()
     now_utc = datetime.now(timezone.utc)
     rows = []
-    for entry in entries:
-        bbox = entry.get("bbox", {})
-        cb = entry.get("citybikes") or {}
-        rows.append(
-            (
-                entry["ville_id"],
-                entry["nom"],
-                1 if entry.get("core_urbanhub") else 0,
-                float(entry["lat"]),
-                float(entry["lon"]),
-                float(bbox.get("lat_min", entry["lat"] - 0.15)),
-                float(bbox.get("lat_max", entry["lat"] + 0.15)),
-                float(bbox.get("lon_min", entry["lon"] - 0.20)),
-                float(bbox.get("lon_max", entry["lon"] + 0.20)),
-                cb.get("network_id", ""),
-                cb.get("network_name", ""),
-                entry.get("noaa_station_id") or "",
-                now_utc,
-            )
-        )
-    columns = [
-        "ville_id",
-        "nom",
-        "core_urbanhub",
-        "latitude",
-        "longitude",
-        "bbox_lat_min",
-        "bbox_lat_max",
-        "bbox_lon_min",
-        "bbox_lon_max",
-        "citybikes_network",
-        "citybikes_name",
-        "noaa_station_id",
-        "updated_at_utc",
+    for v in entries:
+        bbox = v.get("bbox") or {}
+        cb = v.get("citybikes") or {}
+        rows.append((
+            str(v["ville_id"]),
+            str(v.get("nom", v["ville_id"])),
+            1 if v.get("core_urbanhub") else 0,
+            float(v.get("lat", 0.0)),
+            float(v.get("lon", 0.0)),
+            float(bbox.get("lat_min", 0.0)),
+            float(bbox.get("lat_max", 0.0)),
+            float(bbox.get("lon_min", 0.0)),
+            float(bbox.get("lon_max", 0.0)),
+            str(cb.get("network_id", "")),
+            str(cb.get("network_name", "")),
+            str(v.get("noaa_station_id", "")),
+            now_utc,
+        ))
+    cols = [
+        "ville_id", "nom", "core_urbanhub", "latitude", "longitude",
+        "bbox_lat_min", "bbox_lat_max", "bbox_lon_min", "bbox_lon_max",
+        "citybikes_network", "citybikes_name", "noaa_station_id", "updated_at_utc",
     ]
-    return warehouse.insert_rows("urbanhub.ref_ville", rows, columns)
+    count = warehouse.insert_rows("urbanhub.ref_ville", rows, cols)
+    logger.info("Référentiel ClickHouse urbanhub.ref_ville synchronisé (%d villes)", count)
+    return count
 
 
-def init_warehouse(sql_dir: Path | None = None) -> None:
-    """Exécute les scripts SQL par ordre alphabétique puis charge ref_ville et crée le bucket."""
-    target_dir = sql_dir or (PROJECT_ROOT / "sql")
-    bootstrap_wh = get_warehouse(database="")
-    db_warehouse: ClickHouseWarehouse | None = None
+def init_lakehouse(
+    use_local: bool = False,
+    storage: Any = None,
+    warehouse: ClickHouseWarehouse | None = None,
+) -> dict[str, Any]:
+    """Initialise le Data Lake MinIO (3 buckets) puis l'entrepôt ClickHouse (DDL + ref_ville)."""
+    villes = load_ref_ville()
+    logger.info("Référentiel chargé : %d villes françaises configurées", len(villes))
 
-    for sql_file in sorted(target_dir.glob("*.sql")):
-        statements = split_sql_statements(sql_file.read_text(encoding="utf-8"))
-        if not statements:
-            logger.info("Fichier SQL vide ignoré : %s", sql_file.name)
-            continue
-        logger.info("Application de %s (%d instructions)", sql_file.name, len(statements))
-        # 00_commun.sql crée la base `urbanhub`; les fichiers suivants utilisent la base cible
-        target_wh = bootstrap_wh if sql_file.name.startswith("00_") else (db_warehouse or get_warehouse())
-        for stmt in statements:
-            target_wh.execute(stmt)
-        if db_warehouse is None:
-            db_warehouse = get_warehouse()
+    st = storage if storage is not None else get_storage(use_local=use_local)
+    st.ensure_bucket()
 
-    inserted = seed_ref_ville(db_warehouse or get_warehouse())
-    logger.info("urbanhub.ref_ville initialisée avec %d villes", inserted)
+    sql_files: list[str] = []
+    ch_ready = False
+    if not use_local:
+        wh = warehouse if warehouse is not None else get_warehouse(database="")
+        if wh.ping():
+            sql_files = apply_sql_files(wh)
+            seed_ref_ville(wh, villes=villes)
+            ch_ready = True
+        else:
+            logger.warning("ClickHouse injoignable : seul le Data Lake MinIO a été initialisé.")
 
-    try:
-        storage = get_storage(use_local=False)
-        storage.ensure_bucket()
-        logger.info("Bucket bronze/silver prêt : %s", storage.bucket)
-    except Exception as exc:
-        logger.warning("Initialisation du bucket MinIO ignorée : %s", exc)
+    return {
+        "villes": len(villes),
+        "clickhouse_ready": ch_ready,
+        "sql_files": sql_files,
+    }
 
 
 if __name__ == "__main__":
-    init_warehouse()
+    init_lakehouse()

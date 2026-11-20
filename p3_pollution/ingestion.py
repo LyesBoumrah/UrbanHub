@@ -40,6 +40,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from common.period import add_duration_arguments, compute_window
 from p3_pollution.openaq_client import OpenAQClient
 from p3_pollution.storage import storage_from_env
 
@@ -263,9 +264,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--loop", action="store_true", help="collecte latest toutes les heures")
     parser.add_argument("--backfill", action="store_true", help="récupérer l'historique horaire")
-    period = parser.add_mutually_exclusive_group()
-    period.add_argument("--days", type=int, help="backfill : nb de jours d'historique")
-    period.add_argument("--years", type=int, help="backfill : nb d'années d'historique (ex. 5)")
+    add_duration_arguments(parser, default_help_suffix="backfill, défaut : 7 jours")
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
                         help=f"nb de threads en parallèle (défaut {DEFAULT_WORKERS} ; 1 = séquentiel)")
     args = parser.parse_args()
@@ -284,10 +283,18 @@ def main():
     try:
         if args.backfill:
             now = datetime.now(timezone.utc)
-            if args.years:
-                start = datetime(now.year - args.years, 1, 1, tzinfo=timezone.utc)  # années civiles entières
+            has_dur = any(v is not None for v in (args.duration, args.days, args.weeks, args.months, args.years))
+            if has_dur:
+                start, now = compute_window(
+                    days=args.days,
+                    weeks=args.weeks,
+                    months=args.months,
+                    years=args.years,
+                    duration=args.duration,
+                    now=now,
+                )
             else:
-                start = now - timedelta(days=args.days or 7)
+                start = now - timedelta(days=7)
             backfill(client, storage, locations, start, now, workers=args.workers)
         elif args.loop:
             run_loop(client, storage, locations, workers=args.workers)
