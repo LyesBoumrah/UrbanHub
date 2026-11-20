@@ -81,7 +81,20 @@ def _prefer_local() -> bool:
 
 @st.cache_data(ttl=120)
 def load_gold_data() -> tuple[pd.DataFrame, str, bool]:
-    """Charge la table croisée Gold depuis les fichiers JSON Gold (MinIO ou local)."""
+    """Charge la table croisée Gold depuis ClickHouse Lakehouse ou JSON Gold (MinIO / local)."""
+    if not _prefer_local():
+        try:
+            from common.warehouse import try_get_warehouse
+
+            wh = try_get_warehouse()
+            if wh is not None:
+                df = wh.query_df("SELECT * FROM urbanhub.gold_ville_heure FINAL ORDER BY ville_id, heure_utc")
+                if not df.empty:
+                    df["heure_utc"] = pd.to_datetime(df["heure_utc"], utc=True)
+                    return enrich_gold_indicators(df), "ClickHouse Lakehouse (urbanhub.gold_ville_heure)", False
+        except Exception:  # noqa: BLE001
+            pass
+
     order = (True, False) if _prefer_local() else (False, True)
     for use_local in order:
         try:

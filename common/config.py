@@ -45,6 +45,13 @@ class Settings:
     minio_bucket: str = "bronze"
     minio_secure: bool = False
 
+    # ClickHouse (moteur analytique SQL du Data Lakehouse)
+    clickhouse_host: str = "localhost"
+    clickhouse_port: int = 8123
+    clickhouse_user: str = "urbanhub"
+    clickhouse_password: str = "change-me"
+    clickhouse_db: str = "urbanhub"
+
     # Divers
     http_user_agent: str = "UrbanHub-school-project/0.1"
     log_level: str = "INFO"
@@ -65,6 +72,11 @@ class Settings:
             minio_bucket_gold=os.getenv("MINIO_BUCKET_GOLD", "gold"),
             minio_bucket=bucket_bronze,
             minio_secure=os.getenv("MINIO_SECURE", "false").lower() in {"1", "true", "yes"},
+            clickhouse_host=os.getenv("CLICKHOUSE_HOST", "localhost"),
+            clickhouse_port=int(os.getenv("CLICKHOUSE_PORT", "8123")),
+            clickhouse_user=os.getenv("CLICKHOUSE_USER", "urbanhub"),
+            clickhouse_password=os.getenv("CLICKHOUSE_PASSWORD", "change-me"),
+            clickhouse_db=os.getenv("CLICKHOUSE_DB", "urbanhub"),
             http_user_agent=os.getenv("HTTP_USER_AGENT", "UrbanHub-school-project/0.1"),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
             local_data_dir=Path(os.getenv("LOCAL_DATA_DIR", str(PROJECT_ROOT / "data"))),

@@ -26,8 +26,9 @@ def emit_alert(
     ville_id: str = "",
     details: dict[str, Any] | None = None,
     storage: Any | None = None,
+    warehouse: Any | None = None,
 ) -> dict[str, Any]:
-    """Journalise une alerte structurée et l'archive optionnellement en JSON dans le Data Lake."""
+    """Journalise une alerte structurée, l'archive en JSON (Data Lake) et/ou dans ClickHouse."""
     level = niveau.upper()
     if level not in VALID_LEVELS:
         raise ValueError(f"Niveau d'alerte invalide: {niveau!r} (attendu: {sorted(VALID_LEVELS)})")
@@ -59,6 +60,16 @@ def emit_alert(
         except Exception as exc:  # noqa: BLE001
             logger.warning("Impossible d'archiver l'alerte dans le Data Lake : %s", exc)
 
+    if warehouse is not None:
+        try:
+            warehouse.insert_rows(
+                table="urbanhub.pipeline_alertes",
+                rows=[(now_utc, pipeline, ville_id, level, message, details_json)],
+                column_names=["ts_utc", "pipeline", "ville_id", "niveau", "message", "details_json"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Impossible d'écrire l'alerte dans ClickHouse : %s", exc)
+
     return alert_record
 
 
@@ -67,6 +78,7 @@ def write_alert(
     source: str,
     message: str,
     storage: Any | None = None,
+    warehouse: Any | None = None,
 ) -> dict[str, Any]:
     """Alias rétrocompatible P1 autour de `emit_alert`."""
-    return emit_alert(pipeline=source, niveau=level, message=message, storage=storage)
+    return emit_alert(pipeline=source, niveau=level, message=message, storage=storage, warehouse=warehouse)

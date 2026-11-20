@@ -19,17 +19,18 @@ import streamlit as st
 
 from common.config import load_ref_ville
 from common.storage import get_storage
+from common.warehouse import try_get_warehouse
 from p4_croise.build_gold import GOLD_SYNTHESE_KEY
 
 st.set_page_config(
-    page_title="UrbanHub — Jumeau numérique urbain",
+    page_title="UrbanHub — Data Lakehouse Urbain",
     page_icon="🏙️",
     layout="wide",
 )
 
-st.title("🏙️ UrbanHub — Jumeau numérique urbain")
+st.title("🏙️ UrbanHub — Jumeau numérique urbain (Architecture Data Lakehouse)")
 st.markdown(
-    "Plateforme Big Data **100 % Data Lake (Bronze brut → Silver Parquet → Gold JSON métier)** "
+    "Plateforme Big Data **Data Lakehouse (MinIO S3 3 buckets + ClickHouse SQL + CH-UI)** "
     "croisant **3 types de flux** : **Batch Météo Open-Meteo (P1)**, **Streaming Vélos CityBikes (P2)**, "
     "**IoT Pollution OpenAQ (P3)** et **Analyse croisée Gold (P4)**."
 )
@@ -61,16 +62,41 @@ def _detect_datalake() -> tuple[str, bool, int, int, int, dict | None]:
 
 lake_mode, _, nb_bronze, nb_silver, nb_gold, synthese = _detect_datalake()
 
-col1, col2, col3, col4 = st.columns(4)
+
+def _detect_clickhouse() -> dict[str, int | bool]:
+    wh = try_get_warehouse()
+    if wh is None:
+        return {"connected": False}
+    return {
+        "connected": True,
+        "meteo_obs": wh.table_count("urbanhub.meteo_obs"),
+        "velo_releve": wh.table_count("urbanhub.velo_releve"),
+        "air_mesure": wh.table_count("urbanhub.air_mesure"),
+        "gold_ville_heure": wh.table_count("urbanhub.gold_ville_heure"),
+    }
+
+
+ch_stats = _detect_clickhouse()
+
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Villes couvertes", len(villes))
 col2.metric("Data Lake actif", lake_mode)
 col3.metric("Bucket silver (Parquet)", nb_silver)
 col4.metric("Bucket gold (JSON métier)", nb_gold)
+col5.metric("ClickHouse Lakehouse", "Connecté" if ch_stats["connected"] else "Hors ligne")
 
 st.caption(
     f"Bucket **bronze** : **{nb_bronze}** fichiers bruts archivés · "
-    "Architecture 3 buckets MinIO : `s3://bronze` → `s3://silver` → `s3://gold`."
+    "Architecture Lakehouse : `s3://bronze` → `s3://silver` (Parquet) → **ClickHouse SQL** (`:8123` / CH-UI `:3488`) "
+    "+ `s3://gold` (JSON métier)."
 )
+
+if ch_stats["connected"]:
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("ClickHouse `meteo_obs`", f"{ch_stats['meteo_obs']:,}")
+    c2.metric("ClickHouse `velo_releve`", f"{ch_stats['velo_releve']:,}")
+    c3.metric("ClickHouse `air_mesure`", f"{ch_stats['air_mesure']:,}")
+    c4.metric("ClickHouse `gold_ville_heure`", f"{ch_stats['gold_ville_heure']:,}")
 
 if synthese and isinstance(synthese, dict):
     kpis = synthese.get("kpis_globaux_france") or {}

@@ -20,6 +20,7 @@ from typing import Any
 from common.alerts import emit_alert
 from common.log import get_logger
 from common.storage import get_storage
+from common.warehouse import try_get_warehouse
 from p4_croise.analytics import strong_tripartite_interactions
 from p4_croise.build_gold import build_gold, load_gold_df
 
@@ -38,6 +39,7 @@ def p4_gold_flow(use_local: bool = False) -> dict[str, Any]:
         episodes = inter["episodes"]
         if not episodes.empty:
             storage = get_storage(use_local=use_local)
+            warehouse = None if use_local else try_get_warehouse()
             top_ep = episodes.iloc[0]
             emit_alert(
                 pipeline="p4_croise",
@@ -53,6 +55,7 @@ def p4_gold_flow(use_local: bool = False) -> dict[str, Any]:
                     "score_max": float(top_ep["score_interaction_max"]),
                 },
                 storage=storage,
+                warehouse=warehouse,
             )
             alerts += 1
 

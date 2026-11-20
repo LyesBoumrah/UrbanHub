@@ -229,19 +229,22 @@ class MinioStorage:
 
 def storage_from_env(use_local=None):
     """Instancie le backend choisi par `use_local` ou la variable STORAGE (défaut : local)."""
+    from common.config import get_settings
+
+    cfg = get_settings()
     if use_local is True:
-        return LocalStorage()
+        return LocalStorage(base_dir=cfg.local_data_dir)
     kind = "minio" if use_local is False else os.environ.get("STORAGE", "local").lower()
     if kind == "local":
-        return LocalStorage()
+        return LocalStorage(base_dir=cfg.local_data_dir)
     if kind == "minio":
         return MinioStorage(
-            endpoint=os.environ.get("MINIO_ENDPOINT", "localhost:9000"),
-            access_key=os.environ.get("MINIO_ROOT_USER", "urbanhub"),
-            secret_key=os.environ.get("MINIO_ROOT_PASSWORD", "change-me"),
-            bucket_bronze=os.environ.get("MINIO_BUCKET_BRONZE", "bronze"),
-            bucket_silver=os.environ.get("MINIO_BUCKET_SILVER", "silver"),
-            bucket_gold=os.environ.get("MINIO_BUCKET_GOLD", "gold"),
-            secure=os.environ.get("MINIO_SECURE", "false").lower() == "true",
+            endpoint=os.environ.get("MINIO_ENDPOINT", cfg.minio_endpoint),
+            access_key=os.environ.get("MINIO_ROOT_USER", cfg.minio_root_user),
+            secret_key=os.environ.get("MINIO_ROOT_PASSWORD", cfg.minio_root_password),
+            bucket_bronze=os.environ.get("MINIO_BUCKET_BRONZE", cfg.minio_bucket_bronze),
+            bucket_silver=os.environ.get("MINIO_BUCKET_SILVER", cfg.minio_bucket_silver),
+            bucket_gold=os.environ.get("MINIO_BUCKET_GOLD", cfg.minio_bucket_gold),
+            secure=os.environ.get("MINIO_SECURE", str(cfg.minio_secure).lower()).lower() == "true",
         )
     raise ValueError(f"STORAGE inconnu : {kind!r} (attendu : local ou minio)")

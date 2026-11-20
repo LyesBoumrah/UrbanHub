@@ -75,12 +75,32 @@ def _prefer_local() -> bool:
     return os.getenv("STORAGE", "local").lower() == "local"
 
 
+def _read_clickhouse_velos(selected_cities: tuple[str, ...]) -> tuple[list[pd.DataFrame], str]:
+    try:
+        from common.warehouse import try_get_warehouse
+
+        wh = try_get_warehouse()
+        if wh is None:
+            return [], ""
+        if selected_cities:
+            in_list = ", ".join(f"'{c}'" for c in selected_cities)
+            sql = f"SELECT * FROM urbanhub.velo_releve FINAL WHERE ville_id IN ({in_list})"
+        else:
+            sql = "SELECT * FROM urbanhub.velo_releve FINAL"
+        df = wh.query_df(sql)
+        if not df.empty:
+            return [df], "ClickHouse Lakehouse (urbanhub.velo_releve)"
+    except Exception:  # noqa: BLE001
+        pass
+    return [], ""
+
+
 @st.cache_data(ttl=120)
 def load_silver_velos_data(
     selected_cities: tuple[str, ...],
     hours_back: int = 24 * 365 * 5,
 ) -> tuple[pd.DataFrame, str, int]:
-    """Charge les Parquet Silver vélos depuis MinIO S3 ou le disque local `data/silver/`."""
+    """Charge les relevés vélos depuis ClickHouse Lakehouse ou Parquet Silver (MinIO S3 / local)."""
     frames: list[pd.DataFrame] = []
     source_label = "Aucune donnée disponible"
 
@@ -123,7 +143,10 @@ def load_silver_velos_data(
             return out_frames, "Parquet Silver local (data/silver/velos*)"
         return [], ""
 
-    readers = (_read_local, _read_minio) if _prefer_local() else (_read_minio, _read_local)
+    def _read_ch() -> tuple[list[pd.DataFrame], str]:
+        return _read_clickhouse_velos(selected_cities)
+
+    readers = (_read_local, _read_ch, _read_minio) if _prefer_local() else (_read_ch, _read_minio, _read_local)
     for reader in readers:
         frames, source_label = reader()
         if frames:
@@ -172,6 +195,16 @@ def fetch_live_snapshot(selected_cities: list[str], use_local: bool | None = Non
                 all_releves,
                 releve_key=build_silver_streaming_key(now_utc=now_utc),
             )
+            try:
+                from common.warehouse import try_get_warehouse
+                from p2_velos.cleaning import RELEVE_COLUMNS, STATION_COLUMNS
+
+                wh = try_get_warehouse()
+                if wh is not None:
+                    wh.insert_df("urbanhub.velo_station", pd.DataFrame(all_stations)[STATION_COLUMNS])
+                    wh.insert_df("urbanhub.velo_releve", pd.DataFrame(all_releves)[RELEVE_COLUMNS])
+            except Exception:  # noqa: BLE001
+                pass
     return pd.DataFrame(all_releves)
 
 

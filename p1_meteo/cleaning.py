@@ -367,7 +367,43 @@ def aggregate_ville_heure(obs: pd.DataFrame, stations: pd.DataFrame | None = Non
     return agg.sort_values(["ville_id", "heure_utc"]).reset_index(drop=True)
 
 
-def clean_all(storage: Any = None, use_local: bool = False) -> pd.DataFrame:
+def _sync_clickhouse_p1(
+    stations_df: pd.DataFrame,
+    obs_df: pd.DataFrame,
+    warehouse: Any = None,
+) -> int:
+    """Charge les tables Silver P1 (`meteo_station`, `meteo_obs`) dans ClickHouse si joignable."""
+    from common.warehouse import try_get_warehouse
+
+    wh = warehouse if warehouse is not None else try_get_warehouse()
+    if wh is None:
+        return 0
+    try:
+        if not stations_df.empty:
+            st_cols = [
+                "station_id", "nom", "ville_id", "lat", "lon",
+                "nb_heures", "premiere_heure", "derniere_heure",
+            ]
+            st_ins = stations_df.copy()
+            for c in st_cols:
+                if c not in st_ins.columns:
+                    st_ins[c] = None
+            st_ins["nb_heures"] = pd.to_numeric(st_ins["nb_heures"], errors="coerce").fillna(0).astype("uint32")
+            wh.insert_df("urbanhub.meteo_station", st_ins[st_cols])
+
+        if not obs_df.empty:
+            obs_ins = obs_df[SILVER_COLS].copy()
+            obs_ins["is_valid"] = pd.to_numeric(obs_ins["is_valid"], errors="coerce").fillna(1).astype("uint8")
+            obs_ins["quality_flags"] = obs_ins["quality_flags"].fillna("").astype(str)
+            wh.insert_df("urbanhub.meteo_obs", obs_ins)
+            log.info("ClickHouse Lakehouse P1 synchronisé : %d lignes meteo_obs", len(obs_ins))
+            return len(obs_ins)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Synchronisation ClickHouse P1 ignorée : %s", exc)
+    return 0
+
+
+def clean_all(storage: Any = None, use_local: bool = False, warehouse: Any = None) -> pd.DataFrame:
     """Lit tous les JSON bronze Open-Meteo (`bronze/meteo/`), nettoie et écrit les Parquet silver.
 
     La couche silver (`silver/meteo/`) ne contient uniquement que les fichiers Parquet issus du
@@ -432,6 +468,8 @@ def clean_all(storage: Any = None, use_local: bool = False) -> pd.DataFrame:
         len(df),
         len(stations_df),
     )
+    if not use_local or warehouse is not None:
+        _sync_clickhouse_p1(stations_df, df, warehouse=warehouse)
     return df
 
 

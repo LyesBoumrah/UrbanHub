@@ -73,7 +73,20 @@ def _prefer_local() -> bool:
 
 @st.cache_data(ttl=300)
 def load_meteo_data() -> tuple[pd.DataFrame, str]:
-    """Charge l'agrégat horaire par ville depuis les fichiers Parquet Silver (MinIO ou local)."""
+    """Charge l'agrégat horaire par ville depuis ClickHouse Lakehouse ou Parquet Silver (MinIO / local)."""
+    if not _prefer_local():
+        try:
+            from common.warehouse import try_get_warehouse
+
+            wh = try_get_warehouse()
+            if wh is not None:
+                agg = wh.query_df("SELECT * FROM urbanhub.v_meteo_ville_heure ORDER BY ville_id, heure_utc")
+                if not agg.empty:
+                    agg["heure_utc"] = pd.to_datetime(agg["heure_utc"], utc=True)
+                    return agg, "ClickHouse Lakehouse (urbanhub.v_meteo_ville_heure)"
+        except Exception:  # noqa: BLE001
+            pass
+
     order = (True, False) if _prefer_local() else (False, True)
     for use_local in order:
         try:

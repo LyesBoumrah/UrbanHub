@@ -347,7 +347,40 @@ def aggregate_ville_heure(df: pd.DataFrame) -> pd.DataFrame:
     return out[ordered_cols].sort_values(["ville_id", "heure_utc"]).reset_index(drop=True)
 
 
-def clean_all(storage: Any = None, use_local: bool | None = None) -> dict[str, Any]:
+def _sync_clickhouse_p3(
+    capteurs_df: pd.DataFrame,
+    mesures_df: pd.DataFrame,
+    warehouse: Any = None,
+) -> int:
+    """Charge les tables Silver P3 (`air_capteur`, `air_mesure`) dans ClickHouse si joignable."""
+    from common.warehouse import try_get_warehouse
+
+    wh = warehouse if warehouse is not None else try_get_warehouse()
+    if wh is None:
+        return 0
+    try:
+        if not capteurs_df.empty:
+            cap_ins = capteurs_df[CAPTEUR_COLS].copy()
+            cap_ins["provider"] = cap_ins["provider"].fillna("").astype(str)
+            wh.insert_df("urbanhub.air_capteur", cap_ins)
+
+        if not mesures_df.empty:
+            mes_ins = mesures_df[MESURE_COLS].copy()
+            mes_ins["quality_flags"] = mes_ins["quality_flags"].fillna("").astype(str)
+            mes_ins["depasse_oms"] = pd.to_numeric(mes_ins["depasse_oms"], errors="coerce").fillna(0).astype("uint8")
+            mes_ins["depasse_episode"] = (
+                pd.to_numeric(mes_ins["depasse_episode"], errors="coerce").fillna(0).astype("uint8")
+            )
+            mes_ins["is_valid"] = pd.to_numeric(mes_ins["is_valid"], errors="coerce").fillna(1).astype("uint8")
+            wh.insert_df("urbanhub.air_mesure", mes_ins)
+            log.info("ClickHouse Lakehouse P3 synchronisé : %d mesures air_mesure", len(mes_ins))
+            return len(mes_ins)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Synchronisation ClickHouse P3 ignorée : %s", exc)
+    return 0
+
+
+def clean_all(storage: Any = None, use_local: bool | None = None, warehouse: Any = None) -> dict[str, Any]:
     """Lit tous les fichiers bronze OpenAQ (`bronze/openaq/` + `bronze/openaq_backfill/`),
     nettoie, dédoublonne et écrit les Parquet silver strictement dérivés du bronze.
 
@@ -403,11 +436,17 @@ def clean_all(storage: Any = None, use_local: bool | None = None) -> dict[str, A
     capteurs_df = capteurs_df[capteurs_df["sensor_id"].isin(present_sensors)].reset_index(drop=True)
     st.write_parquet(CAPTEUR_SILVER_KEY, capteurs_df)
 
+    is_local = use_local is True or hasattr(st, "base_dir")
+    ch_rows = 0
+    if not is_local or warehouse is not None:
+        ch_rows = _sync_clickhouse_p3(capteurs_df, mesures_df, warehouse=warehouse)
+
     result = {
         "bronze_files": len(keys),
         "raw_messages": len(all_messages),
         "capteurs": len(capteurs_df),
         "mesures_valides": len(mesures_df),
+        "clickhouse_rows": ch_rows,
         "quality": q_summary,
     }
     log.info("Nettoyage P3 terminé (Bronze -> Silver Parquet) : %s", result)

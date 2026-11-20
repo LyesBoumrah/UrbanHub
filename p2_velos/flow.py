@@ -27,8 +27,11 @@ from common.alerts import emit_alert
 from common.log import get_logger
 from common.period import DEFAULT_FETCH_DURATION, add_duration_arguments
 from common.storage import get_storage
+from common.warehouse import try_get_warehouse
 from p2_velos.backfill import DEFAULT_HISTORY_YEARS, run_backfill
 from p2_velos.cleaning import (
+    RELEVE_COLUMNS,
+    STATION_COLUMNS,
     build_silver_streaming_key,
     clean_bronze_payload,
     get_bbox_map,
@@ -147,12 +150,28 @@ def write_silver_parquet_task(
         releve_key=build_silver_streaming_key(),
         station_key=station_key,
     )
+
+    ch_rows = 0
+    wh = try_get_warehouse()
+    if wh is not None:
+        try:
+            import pandas as pd
+
+            if stations:
+                wh.insert_df("urbanhub.velo_station", pd.DataFrame(stations)[STATION_COLUMNS])
+            if releves:
+                ch_rows = wh.insert_df("urbanhub.velo_releve", pd.DataFrame(releves)[RELEVE_COLUMNS])
+            logger.info("ClickHouse Lakehouse P2 synchronisé : %d relevés velo_releve", ch_rows)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Synchronisation ClickHouse P2 ignorée : %s", exc)
+
     return {
-        "backend": "minio_silver_parquet",
+        "backend": "lakehouse_minio_clickhouse" if ch_rows > 0 else "minio_silver_parquet",
         "releve_key": releve_key,
         "station_key": station_key,
         "stations_count": len(stations),
         "releves_count": len(releves),
+        "clickhouse_rows": ch_rows,
     }
 
 
@@ -162,6 +181,7 @@ def emit_alerts_task(
 ) -> int:
     """Émet les alertes pipeline en cas de panne API, fort taux de rejet ou tension réseau."""
     storage = get_storage(use_local=use_local)
+    warehouse = None if use_local else try_get_warehouse()
 
     alerts_count = 0
     for summary in city_summaries:
@@ -174,6 +194,7 @@ def emit_alerts_task(
                 ville_id=ville_id,
                 details={"network_id": summary["network_id"], "error": summary.get("error")},
                 storage=storage,
+                warehouse=warehouse,
             )
             alerts_count += 1
             continue
@@ -192,6 +213,7 @@ def emit_alerts_task(
                     "reasons": summary.get("reasons_summary", {}),
                 },
                 storage=storage,
+                warehouse=warehouse,
             )
             alerts_count += 1
 
@@ -209,6 +231,7 @@ def emit_alerts_task(
                     "valid_count": summary["valid_count"],
                 },
                 storage=storage,
+                warehouse=warehouse,
             )
             alerts_count += 1
 

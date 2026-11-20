@@ -303,6 +303,24 @@ def backfill_single_dump(
             releve_key=build_silver_historical_key(dump.ville_id, dump.year, dump.ym),
             station_key=hist_station_key,
         )
+        try:
+            from common.warehouse import try_get_warehouse
+            from p2_velos.cleaning import RELEVE_COLUMNS, STATION_COLUMNS
+
+            wh = try_get_warehouse()
+            if wh is not None:
+                if not df_stations.empty:
+                    wh.insert_df("urbanhub.velo_station", df_stations[STATION_COLUMNS])
+                if not df_releves.empty:
+                    wh.insert_df("urbanhub.velo_releve", df_releves[RELEVE_COLUMNS])
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[%d][%s][%s] Synchronisation ClickHouse ignorée : %s",
+                dump.year,
+                dump.ville_id,
+                dump.ym,
+                exc,
+            )
         logger.info(
             "[%d][%s][%s] Bronze -> Silver Parquet : %d stations, %d relevés (%s, rejets: %.1f %%)",
             dump.year,

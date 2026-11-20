@@ -1051,8 +1051,33 @@ def _load_local_velos_silver(base_dir: Path) -> pd.DataFrame:
     return _deduplicate_velos_silver(pd.concat(frames, ignore_index=True)) if frames else pd.DataFrame()
 
 
-def build_gold(use_local: bool = False, storage: Any = None) -> dict[str, Any]:
-    """Lit strictement les fichiers Parquet Silver (`silver/`) et génère uniquement les JSON métier en `gold/`."""
+def _sync_clickhouse_gold(gold_df: pd.DataFrame, warehouse: Any = None) -> int:
+    """Charge la table Gold `urbanhub.gold_ville_heure` dans ClickHouse (moteur SQL Lakehouse)."""
+    from common.warehouse import try_get_warehouse
+
+    if gold_df.empty:
+        return 0
+    wh = warehouse if warehouse is not None else try_get_warehouse()
+    if wh is None:
+        return 0
+    try:
+        df_ins = gold_df[GOLD_COLS].copy()
+        df_ins["heure_utc"] = pd.to_datetime(df_ins["heure_utc"], utc=True)
+        df_ins["polluant_dominant"] = df_ins["polluant_dominant"].fillna("").astype(str)
+        df_ins["regime_interaction"] = df_ins["regime_interaction"].fillna("normal").astype(str)
+        df_ins["condition_favorable_velo"] = (
+            pd.to_numeric(df_ins["condition_favorable_velo"], errors="coerce").fillna(0).astype("uint8")
+        )
+        wh.insert_df("urbanhub.gold_ville_heure", df_ins)
+        log.info("ClickHouse Lakehouse Gold synchronisé : %d lignes urbanhub.gold_ville_heure", len(df_ins))
+        return len(df_ins)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Synchronisation ClickHouse Gold ignorée : %s", exc)
+        return 0
+
+
+def build_gold(use_local: bool = False, storage: Any = None, warehouse: Any = None) -> dict[str, Any]:
+    """Lit les Parquet Silver (`s3://silver/`), écrit les JSON métier (`s3://gold/`) et synchronise ClickHouse."""
     st = storage if storage is not None else get_storage(use_local=use_local)
     base_dir = Path(getattr(st, "base_dir", get_settings().local_data_dir))
 
@@ -1084,7 +1109,11 @@ def build_gold(use_local: bool = False, storage: Any = None) -> dict[str, Any]:
         pollution_raw_df=pollution_raw_df,
         gold_df=gold_df,
     )
-    log.info("Couche Gold JSON générée : %d fichiers JSON", len(gold_json_files))
+    ch_rows = 0
+    if not use_local or warehouse is not None:
+        ch_rows = _sync_clickhouse_gold(gold_df, warehouse=warehouse)
+
+    log.info("Couche Gold Lakehouse générée : %d fichiers JSON, %d lignes ClickHouse", len(gold_json_files), ch_rows)
 
     return {
         "meteo_rows": len(meteo_df),
@@ -1092,6 +1121,7 @@ def build_gold(use_local: bool = False, storage: Any = None) -> dict[str, Any]:
         "pollution_rows": len(pollution_raw_df),
         "gold_rows": len(gold_df),
         "gold_json_files": gold_json_files,
+        "clickhouse_gold_rows": ch_rows,
     }
 
 
