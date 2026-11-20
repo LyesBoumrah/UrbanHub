@@ -36,7 +36,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "paris",
@@ -67,7 +68,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "paris",
@@ -98,7 +100,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "paris",
@@ -124,7 +127,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "paris",
@@ -150,7 +154,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lille",
@@ -181,7 +186,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lille",
@@ -212,7 +218,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lille",
@@ -238,7 +245,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "marseille",
@@ -274,6 +282,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        4110
       ]
     },
     {
@@ -300,7 +311,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "marseille",
@@ -326,6 +338,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3985
       ]
     },
     {
@@ -342,6 +357,9 @@
           "pollutant": "o3",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        4150
       ]
     },
     {
@@ -373,7 +391,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "rouen",
@@ -404,6 +423,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        4128
       ]
     },
     {
@@ -430,7 +452,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "rouen",
@@ -446,7 +469,8 @@
           "pollutant": "o3",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "rouen",
@@ -462,7 +486,8 @@
           "pollutant": "pm10",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lyon",
@@ -493,7 +518,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lyon",
@@ -519,7 +545,8 @@
           "pollutant": "pm10",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lyon",
@@ -545,7 +572,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lyon",
@@ -571,7 +599,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "lyon",
@@ -597,7 +626,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "toulouse",
@@ -628,6 +658,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3455
       ]
     },
     {
@@ -659,7 +692,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "toulouse",
@@ -690,6 +724,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3756
       ]
     },
     {
@@ -716,7 +753,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "toulouse",
@@ -742,7 +780,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "bordeaux",
@@ -773,6 +812,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3689
       ]
     },
     {
@@ -804,6 +846,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3572
       ]
     },
     {
@@ -830,7 +875,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "bordeaux",
@@ -856,6 +902,9 @@
           "pollutant": "pm10",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3653
       ]
     },
     {
@@ -877,7 +926,8 @@
           "pollutant": "pm10",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "nantes",
@@ -908,6 +958,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3670
       ]
     },
     {
@@ -939,7 +992,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "nantes",
@@ -965,7 +1019,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "nantes",
@@ -981,7 +1036,8 @@
           "pollutant": "o3",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "strasbourg",
@@ -1012,7 +1068,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "strasbourg",
@@ -1043,7 +1100,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "strasbourg",
@@ -1069,7 +1127,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "strasbourg",
@@ -1095,7 +1154,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "strasbourg",
@@ -1116,7 +1176,8 @@
           "pollutant": "pm10",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "montpellier",
@@ -1147,7 +1208,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "montpellier",
@@ -1173,7 +1235,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "montpellier",
@@ -1189,6 +1252,9 @@
           "pollutant": "no2",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3568
       ]
     },
     {
@@ -1205,7 +1271,8 @@
           "pollutant": "no2",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "montpellier",
@@ -1221,6 +1288,9 @@
           "pollutant": "o3",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        3567
       ]
     },
     {
@@ -1252,7 +1322,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "rennes",
@@ -1278,6 +1349,9 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        4098
       ]
     },
     {
@@ -1294,6 +1368,9 @@
           "pollutant": "no2",
           "unit": "µg/m³"
         }
+      ],
+      "predecessor_location_ids": [
+        5725
       ]
     },
     {
@@ -1310,7 +1387,8 @@
           "pollutant": "o3",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "clermont-ferrand",
@@ -1341,7 +1419,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "clermont-ferrand",
@@ -1367,7 +1446,8 @@
           "pollutant": "pm25",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "clermont-ferrand",
@@ -1393,7 +1473,8 @@
           "pollutant": "pm10",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "clermont-ferrand",
@@ -1414,7 +1495,8 @@
           "pollutant": "o3",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     },
     {
       "ville_id": "clermont-ferrand",
@@ -1430,7 +1512,9 @@
           "pollutant": "no2",
           "unit": "µg/m³"
         }
-      ]
+      ],
+      "predecessor_location_ids": []
     }
-  ]
+  ],
+  "predecessor_rule": "Même station physique renumérotée par l'EEA en 2024 : ancienne station officielle à < 150 m, arrêtée entre mi-2023 et mi-2024, polluants communs (vérifié le 20/11/2026)."
 }

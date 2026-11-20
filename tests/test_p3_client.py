@@ -25,20 +25,20 @@ def test_pause_commune_quand_quota_presque_atteint(monkeypatch):
 
 def test_la_pause_bloque_tous_les_threads():
     lim = SharedRateLimiter()
+    t_pause = time.monotonic()
     lim.pause(0.5, "test")
-    durations = []
+    released_at = []
 
     def worker():
-        t0 = time.monotonic()
         lim.wait()
-        durations.append(time.monotonic() - t0)
+        released_at.append(time.monotonic() - t_pause)  # mesuré depuis la pause, pas depuis le thread
 
     threads = [threading.Thread(target=worker) for _ in range(4)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-    assert len(durations) == 4 and min(durations) >= 0.4
+    assert len(released_at) == 4 and min(released_at) >= 0.45  # aucun thread libéré avant la fin
 
 
 def test_la_plus_longue_pause_l_emporte():

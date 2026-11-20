@@ -1,317 +1,210 @@
-"""P2 — Fonctions analytiques répondant aux 5 questions métier sur la mobilité urbaine.
+"""P2 — Analyses vélos à partir du silver (48,6 M lignes station × heure).
 
-Partagées entre le dashboard Streamlit (dashboard/pages/2_Velos.py) et le notebook
-d'analyse exploratoire (notebooks/02_velos.ipynb) pour éviter toute duplication.
+Le silver est trop volumineux pour être chargé d'un bloc : chaque fichier (ville × mois) est réduit à des
+SOMMES et des COMPTAGES (`aggregate_file`), puis les agrégats sont combinés (`combine`) — le principe
+« map → reduce ». Les questions sont ensuite calculées sur ces agrégats.
 
-Questions métier couvertes :
-1. Quelles stations présentent le plus fort taux d'utilisation ?
-2. Peut-on identifier des zones où l'offre de vélos est insuffisante ?
-3. Quels sont les pics d'utilisation journaliers du réseau de vélos ?
-4. Existe-t-il des déséquilibres géographiques dans la disponibilité des vélos ?
-5. Peut-on détecter des stations critiques nécessitant un rééquilibrage des vélos ?
+Questions du sujet :
+  Q1  Stations au plus fort taux d'utilisation      → activité moyenne par jour (mouvements = emprunts + retours)
+  Q2  Zones où l'offre de vélos est insuffisante    → % du temps où les stations sont vides, grille ~500 m
+  Q3  Pics d'utilisation journaliers                → activité par heure locale × jour de semaine
+  Q4  Déséquilibres géographiques                   → remplissage matin vs soir, centre vs périphérie
+  Q5  Stations critiques à rééquilibrer             → % des heures de pointe vides / pleines → score
+
+Heures de pointe (jours ouvrés, heure locale) : 7 h-10 h et 17 h-20 h.
 
 Responsable : P2.
 """
-
 from __future__ import annotations
 
-import math
-from typing import Any, Mapping
-
+import numpy as np
 import pandas as pd
 
-
-def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Distance grand-cercle en kilomètres entre deux coordonnées WGS84."""
-    r = 6371.0
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2.0) ** 2
-    return 2.0 * r * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+COLUMNS = ["ville_id", "station_id", "heure_utc", "activite", "taux_remplissage", "est_vide", "est_pleine",
+           "etat_observe", "is_valid"]
+MORNING, EVENING = (7, 8, 9), (17, 18, 19)
+CELL_M = 500  # taille de maille des zones (m)
 
 
-def ensure_enriched_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """S'assure que le DataFrame dispose des colonnes dérivées et timestamps UTC."""
-    if df.empty:
-        return df.copy()
-    out = df.copy()
-    out["timestamp"] = pd.to_datetime(out["timestamp"], utc=True)
+# ---------------------------------------------------------------- map : un fichier → agrégats
 
-    if "capacity" not in out.columns:
-        out["capacity"] = out["bikes_available"] + out["free_slots"]
-    safe_cap = out["capacity"].replace(0, pd.NA)
-    if "taux_occupation" not in out.columns:
-        out["taux_occupation"] = (out["bikes_available"] / safe_cap).fillna(0.0).astype(float)
-    if "taux_utilisation" not in out.columns:
-        out["taux_utilisation"] = (out["free_slots"] / safe_cap).fillna(0.0).astype(float)
-    if "est_vide" not in out.columns:
-        out["est_vide"] = (out["bikes_available"] == 0).astype(int)
-    if "est_pleine" not in out.columns:
-        out["est_pleine"] = (out["free_slots"] == 0).astype(int)
-    if "est_critique" not in out.columns:
-        out["est_critique"] = (
-            (out["taux_occupation"] <= 0.10) | (out["taux_occupation"] >= 0.90)
-        ).astype(int)
-    return out
+def prepare(df: pd.DataFrame) -> pd.DataFrame:
+    d = df[df["is_valid"]].copy()
+    local = d["heure_utc"].dt.tz_convert("Europe/Paris")
+    d["h"] = local.dt.hour.astype("int8")
+    d["wd"] = local.dt.dayofweek.astype("int8")
+    d["ouvre"] = d["wd"] < 5
+    d["pointe"] = d["ouvre"] & d["h"].isin(MORNING + EVENING)
+    d["matin"] = d["ouvre"] & d["h"].isin(MORNING)
+    d["soir"] = d["ouvre"] & d["h"].isin(EVENING)
+    for c in ("est_vide", "est_pleine"):
+        d[c] = d[c].astype("int32")
+    return d
 
 
-# ============================================================================
-# Question 1 : Quelles stations présentent le plus fort taux d'utilisation ?
-# ============================================================================
-def top_utilisation_stations(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    """Classe les stations par taux d'utilisation moyen, volatilité et rotation."""
-    data = ensure_enriched_dataframe(df)
-    if data.empty:
-        return pd.DataFrame()
-
-    data = data.sort_values(["ville_id", "station_id", "timestamp"])
-    data["abs_delta_bikes"] = (
-        data.groupby(["ville_id", "station_id"])["bikes_available"].diff().abs().fillna(0.0)
-    )
-
-    agg = (
-        data.groupby(["ville_id", "station_id"], as_index=False)
-        .agg(
-            station_name=("station_name", "last"),
-            latitude=("latitude", "last"),
-            longitude=("longitude", "last"),
-            capacite_moyenne=("capacity", "mean"),
-            velos_dispo_moyens=("bikes_available", "mean"),
-            taux_utilisation_moyen=("taux_utilisation", "mean"),
-            taux_occupation_moyen=("taux_occupation", "mean"),
-            volatilite_velos=("bikes_available", "std"),
-            min_velos=("bikes_available", "min"),
-            max_velos=("bikes_available", "max"),
-            rotation_totale=("abs_delta_bikes", "sum"),
-            nb_releves=("timestamp", "count"),
-        )
-    )
-    agg["volatilite_velos"] = agg["volatilite_velos"].fillna(0.0).round(2)
-    agg["amplitude_velos"] = agg["max_velos"] - agg["min_velos"]
-    agg["taux_utilisation_pct"] = (agg["taux_utilisation_moyen"] * 100.0).round(1)
-    agg["taux_occupation_pct"] = (agg["taux_occupation_moyen"] * 100.0).round(1)
-    agg["capacite_moyenne"] = agg["capacite_moyenne"].round(1)
-    agg["velos_dispo_moyens"] = agg["velos_dispo_moyens"].round(1)
-
-    return agg.sort_values(
-        by=["taux_utilisation_moyen", "rotation_totale", "capacite_moyenne"],
-        ascending=[False, False, False],
-    ).head(top_n)
+def aggregate_file(df: pd.DataFrame) -> dict:
+    """Réduit un fichier silver à des sommes / comptages additifs."""
+    d = prepare(df)
+    station = d.groupby(["ville_id", "station_id"]).agg(
+        heures=("activite", "size"), activite=("activite", "sum"), vide=("est_vide", "sum"),
+        pleine=("est_pleine", "sum"), remplissage=("taux_remplissage", "sum"))
+    peak = d[d["pointe"]].groupby(["ville_id", "station_id"]).agg(
+        h_pointe=("activite", "size"), vide_pointe=("est_vide", "sum"), pleine_pointe=("est_pleine", "sum"))
+    mat = d[d["matin"]].groupby(["ville_id", "station_id"]).agg(
+        h_matin=("activite", "size"), rempl_matin=("taux_remplissage", "sum"))
+    soi = d[d["soir"]].groupby(["ville_id", "station_id"]).agg(
+        h_soir=("activite", "size"), rempl_soir=("taux_remplissage", "sum"))
+    station = station.join(peak, how="left").join(mat, how="left").join(soi, how="left").fillna(0)
+    week = d.groupby(["ville_id", "wd", "h"]).agg(heures=("activite", "size"), activite=("activite", "sum"))
+    return {"station": station, "week": week}
 
 
-# ============================================================================
-# Question 2 : Zones où l'offre de vélos est insuffisante
-# ============================================================================
-def detect_undersupplied_zones(
-    df: pd.DataFrame,
-    grid_precision: int = 2,
-    low_supply_threshold: float = 0.15,
-    min_stations: int = 1,
-) -> pd.DataFrame:
-    """Identifie les zones géographiques souffrant d'une offre de vélos insuffisante.
-
-    Regroupe les stations par cellule spatiale (grid_precision=2 ~ 1.1 km, 3 ~ 110 m)
-    et calcule la fréquence de pénurie (<= 15 % de vélos disponibles) et de vacuité (0 vélo).
-    """
-    data = ensure_enriched_dataframe(df)
-    if data.empty:
-        return pd.DataFrame()
-
-    data["zone_lat"] = data["latitude"].round(grid_precision)
-    data["zone_lon"] = data["longitude"].round(grid_precision)
-    data["en_sous_offre"] = (data["taux_occupation"] <= low_supply_threshold).astype(int)
-
-    zones = (
-        data.groupby(["ville_id", "zone_lat", "zone_lon"], as_index=False)
-        .agg(
-            nb_stations=("station_id", "nunique"),
-            exemple_station=("station_name", "first"),
-            capacite_totale=("capacity", lambda s: round(float(s.mean()) * data.loc[s.index, "station_id"].nunique())),
-            velos_dispo_moyens=("bikes_available", "mean"),
-            taux_occupation_moyen=("taux_occupation", "mean"),
-            pct_temps_vide=("est_vide", "mean"),
-            pct_temps_sous_offre=("en_sous_offre", "mean"),
-            nb_releves=("timestamp", "count"),
-        )
-    )
-    zones = zones[zones["nb_stations"] >= min_stations].copy()
-    zones["velos_dispo_moyens"] = zones["velos_dispo_moyens"].round(2)
-    zones["taux_occupation_pct"] = (zones["taux_occupation_moyen"] * 100.0).round(1)
-    zones["pct_temps_vide"] = (zones["pct_temps_vide"] * 100.0).round(1)
-    zones["pct_temps_sous_offre"] = (zones["pct_temps_sous_offre"] * 100.0).round(1)
-
-    return zones.sort_values(
-        by=["pct_temps_sous_offre", "pct_temps_vide", "taux_occupation_moyen"],
-        ascending=[False, False, True],
-    )
+def combine(parts: list[dict]) -> dict:
+    """Somme des agrégats de tous les fichiers (reduce)."""
+    return {k: pd.concat([p[k] for p in parts]).groupby(level=list(range(parts[0][k].index.nlevels))).sum()
+            for k in parts[0]}
 
 
-# ============================================================================
-# Question 3 : Pics d'utilisation journaliers du réseau
-# ============================================================================
-def daily_usage_peaks(df: pd.DataFrame, tz: str = "Europe/Paris") -> pd.DataFrame:
-    """Calcule le profil horaire (0h-23h heure locale) distinguant semaine et week-end."""
-    data = ensure_enriched_dataframe(df)
-    if data.empty:
-        return pd.DataFrame()
-
-    local_ts = data["timestamp"].dt.tz_convert(tz)
-    data["heure_locale"] = local_ts.dt.hour
-    data["type_jour"] = local_ts.dt.dayofweek.map(lambda d: "Week-end" if d >= 5 else "Semaine")
-
-    peaks = (
-        data.groupby(["ville_id", "type_jour", "heure_locale"], as_index=False)
-        .agg(
-            taux_utilisation_moyen=("taux_utilisation", "mean"),
-            taux_occupation_moyen=("taux_occupation", "mean"),
-            velos_dispo_moyens=("bikes_available", "mean"),
-            pct_stations_vides=("est_vide", "mean"),
-            pct_stations_pleines=("est_pleine", "mean"),
-            nb_releves=("timestamp", "count"),
-        )
-    )
-    peaks["taux_utilisation_pct"] = (peaks["taux_utilisation_moyen"] * 100.0).round(1)
-    peaks["taux_occupation_pct"] = (peaks["taux_occupation_moyen"] * 100.0).round(1)
-    peaks["pct_stations_vides"] = (peaks["pct_stations_vides"] * 100.0).round(1)
-    peaks["pct_stations_pleines"] = (peaks["pct_stations_pleines"] * 100.0).round(1)
-    return peaks.sort_values(["ville_id", "type_jour", "heure_locale"])
+def load_aggregates(storage, read_table) -> dict:
+    keys = sorted(k for k in storage.list("silver/velos/") if k.endswith("velos_heure.parquet"))
+    return combine([aggregate_file(read_table(storage, k, COLUMNS)) for k in keys])
 
 
-# ============================================================================
-# Question 4 : Déséquilibres géographiques dans la disponibilité des vélos
-# ============================================================================
-def geographic_imbalance(
-    df: pd.DataFrame,
-    city_centers: Mapping[str, tuple[float, float]],
-    center_radius_km: float = 1.5,
-) -> pd.DataFrame:
-    """Mesure les écarts de disponibilité entre le centre-ville et les quadrants N/S/E/O."""
-    data = ensure_enriched_dataframe(df)
-    if data.empty:
-        return pd.DataFrame()
+# ---------------------------------------------------------------- indicateurs par station
 
-    def _classify_sector(row: Any) -> tuple[str, float]:
-        center = city_centers.get(row["ville_id"])
-        if center is None:
-            return ("Inconnu", 0.0)
-        clat, clon = center
-        dist = haversine_km(row["latitude"], row["longitude"], clat, clon)
-        if dist <= center_radius_km:
-            return (f"Centre (<{center_radius_km:.1f} km)", dist)
-        ns = "Nord" if row["latitude"] >= clat else "Sud"
-        ew = "Est" if row["longitude"] >= clon else "Ouest"
-        return (f"{ns}-{ew}", dist)
-
-    sectors = data.apply(_classify_sector, axis=1)
-    data["secteur_geo"] = [s[0] for s in sectors]
-    data["distance_centre_km"] = [s[1] for s in sectors]
-
-    summary = (
-        data.groupby(["ville_id", "secteur_geo"], as_index=False)
-        .agg(
-            nb_stations=("station_id", "nunique"),
-            distance_moyenne_km=("distance_centre_km", "mean"),
-            velos_dispo_moyens=("bikes_available", "mean"),
-            taux_occupation_moyen=("taux_occupation", "mean"),
-            taux_utilisation_moyen=("taux_utilisation", "mean"),
-            pct_temps_vide=("est_vide", "mean"),
-            pct_temps_pleine=("est_pleine", "mean"),
-            ecart_type_occupation=("taux_occupation", "std"),
-        )
-    )
-    summary["distance_moyenne_km"] = summary["distance_moyenne_km"].round(2)
-    summary["velos_dispo_moyens"] = summary["velos_dispo_moyens"].round(1)
-    summary["taux_occupation_pct"] = (summary["taux_occupation_moyen"] * 100.0).round(1)
-    summary["taux_utilisation_pct"] = (summary["taux_utilisation_moyen"] * 100.0).round(1)
-    summary["pct_temps_vide"] = (summary["pct_temps_vide"] * 100.0).round(1)
-    summary["pct_temps_pleine"] = (summary["pct_temps_pleine"] * 100.0).round(1)
-    summary["ecart_type_occupation"] = summary["ecart_type_occupation"].fillna(0.0).round(3)
-
-    # Écart par rapport à la moyenne de la ville (indice de déséquilibre spatial)
-    city_avg = summary.groupby("ville_id")["taux_occupation_pct"].transform("mean")
-    summary["ecart_moyenne_ville_pts"] = (summary["taux_occupation_pct"] - city_avg).round(1)
-    return summary.sort_values(["ville_id", "ecart_moyenne_ville_pts"])
+def haversine_m(lat1, lon1, lat2, lon2):
+    r = 6_371_000
+    p1, p2 = np.radians(lat1), np.radians(lat2)
+    dp, dl = p2 - p1, np.radians(lon2 - lon1)
+    a = np.sin(dp / 2) ** 2 + np.cos(p1) * np.cos(p2) * np.sin(dl / 2) ** 2
+    return 2 * r * np.arcsin(np.sqrt(a))
 
 
-# ============================================================================
-# Question 5 : Détection des stations critiques nécessitant un rééquilibrage
-# ============================================================================
-def detect_critical_stations(
-    df: pd.DataFrame,
-    low_threshold: float = 0.10,
-    high_threshold: float = 0.90,
-) -> pd.DataFrame:
-    """Détecte les stations critiques (pénurie <= 10 % ou saturation >= 90 %) et propose une action."""
-    data = ensure_enriched_dataframe(df)
-    if data.empty:
-        return pd.DataFrame()
+def station_indicators(agg: dict, stations: pd.DataFrame, villes: list[dict], min_jours: int = 30) -> pd.DataFrame:
+    """Indicateurs par station (seules les stations observées au moins `min_jours` jours sont gardées)."""
+    s = agg["station"].reset_index()
+    s["jours"] = s["heures"] / 24
+    s = s[s["jours"] >= min_jours].copy()
+    s["activite_jour"] = s["activite"] / s["jours"]
+    s["pct_vide"] = 100 * s["vide"] / s["heures"]
+    s["pct_pleine"] = 100 * s["pleine"] / s["heures"]
+    s["remplissage_moy"] = s["remplissage"] / s["heures"]
+    s["pct_vide_pointe"] = 100 * s["vide_pointe"] / s["h_pointe"].replace(0, np.nan)
+    s["pct_pleine_pointe"] = 100 * s["pleine_pointe"] / s["h_pointe"].replace(0, np.nan)
+    s["rempl_matin"] = s["rempl_matin"] / s["h_matin"].replace(0, np.nan)
+    s["rempl_soir"] = s["rempl_soir"] / s["h_soir"].replace(0, np.nan)
+    s["delta_soir_matin"] = s["rempl_soir"] - s["rempl_matin"]
+    s = s.merge(stations[["ville_id", "station_id", "station_nom", "latitude", "longitude", "capacite_declaree"]],
+                on=["ville_id", "station_id"], how="left")
+    centre = pd.DataFrame(villes)[["ville_id", "lat", "lon"]]
+    s = s.merge(centre, on="ville_id", how="left")
+    s["distance_centre_km"] = haversine_m(s["lat"], s["lon"], s["latitude"], s["longitude"]) / 1000
+    s["statut_station"] = station_status(s)
+    return s.drop(columns=["lat", "lon"])
 
-    data = data.sort_values(["ville_id", "station_id", "timestamp"])
 
-    persistence = (
-        data.groupby(["ville_id", "station_id"], as_index=False)
-        .agg(
-            pct_temps_critique=("est_critique", "mean"),
-            pct_temps_vide=("est_vide", "mean"),
-            pct_temps_pleine=("est_pleine", "mean"),
-            nb_releves=("timestamp", "count"),
-        )
-    )
+MAX_ROTATION = 50  # mouvements / jour / place : au-delà, la « station » n'est pas une borne réelle (q99 ≈ 15)
 
-    latest = data.groupby(["ville_id", "station_id"], as_index=False).last()
-    merged = latest.merge(persistence, on=["ville_id", "station_id"], how="left")
 
-    def _action(occ: float) -> str:
-        if occ <= low_threshold:
-            return "REAPPROVISIONNER"
-        if occ >= high_threshold:
-            return "DESENGORGER"
-        return "AUCUNE"
+def station_status(s: pd.DataFrame) -> pd.Series:
+    """technique (nom vide / TEST) · aberrante (rotation impossible) · inactive (< 1 mouvement/jour) · exploitable."""
+    nom = s["station_nom"].fillna("").str.strip()
+    # rotation calculée seulement si la capacité déclarée est crédible (≥ 5 places) : une capacité saisie à 1
+    # ferait passer une station normale pour aberrante
+    rotation = s["activite_jour"] / s["capacite_declaree"].where(s["capacite_declaree"] >= 5)
+    technique = nom.eq("") | nom.str.contains(r"\btest\b|atelier", case=False, regex=True)
+    return pd.Series(np.select(
+        [technique, rotation > MAX_ROTATION, s["activite_jour"] < 1],
+        ["technique", "aberrante", "inactive"], default="exploitable"), index=s.index)
 
-    def _severity(row: Any) -> str:
-        occ = row["taux_occupation"]
-        if row["bikes_available"] == 0:
-            return "CRITIQUE_VIDE"
-        if row["free_slots"] == 0:
-            return "CRITIQUE_PLEINE"
-        if occ <= low_threshold:
-            return "PENURIE_CRITIQUE"
-        if occ >= high_threshold:
-            return "SATURATION_CRITIQUE"
-        return "NORMAL"
 
-    merged["action_reequilibrage"] = merged["taux_occupation"].map(_action)
-    merged["statut_criticite"] = merged.apply(_severity, axis=1)
-    merged["taux_occupation_pct"] = (merged["taux_occupation"] * 100.0).round(1)
-    merged["pct_temps_critique"] = (merged["pct_temps_critique"] * 100.0).round(1)
-    merged["delta_velos_equilibre"] = (
-        (merged["capacity"] * 0.5).round().astype(int) - merged["bikes_available"].astype(int)
-    )
+def usable(ind: pd.DataFrame) -> pd.DataFrame:
+    return ind[ind["statut_station"] == "exploitable"]
 
-    # Score de priorité (combinaison sévérité immédiate, persistance et taille de la station)
-    merged["score_priorite"] = (
-        (merged["taux_occupation"] - 0.5).abs() * 2.0 * 50.0
-        + merged["pct_temps_critique"] * 0.35
-        + merged["capacity"].clip(upper=50) * 0.30
-    ).round(1)
 
-    critical_only = merged[merged["action_reequilibrage"] != "AUCUNE"].copy()
-    cols = [
-        "ville_id",
-        "station_id",
-        "station_name",
-        "latitude",
-        "longitude",
-        "timestamp",
-        "bikes_available",
-        "free_slots",
-        "capacity",
-        "taux_occupation_pct",
-        "statut_criticite",
-        "action_reequilibrage",
-        "delta_velos_equilibre",
-        "pct_temps_critique",
-        "score_priorite",
-    ]
-    return critical_only[cols].sort_values("score_priorite", ascending=False)
+# ---------------------------------------------------------------- Q1 utilisation
+
+def top_stations(ind: pd.DataFrame, n: int = 10) -> pd.DataFrame:
+    return ind.nlargest(n, "activite_jour")[["ville_id", "station_nom", "activite_jour", "capacite_declaree",
+                                            "distance_centre_km"]].reset_index(drop=True)
+
+
+def concentration(ind: pd.DataFrame) -> pd.DataFrame:
+    """Part de l'activité totale portée par les 10 % de stations les plus actives, par ville."""
+    rows = []
+    for v, g in ind.groupby("ville_id"):
+        s = g["activite_jour"].sort_values(ascending=False)
+        k = max(1, int(round(len(s) * 0.10)))
+        rows.append({"ville_id": v, "stations": len(s), "activite_jour_station": round(s.mean(), 1),
+                     "part_top10pct": round(100 * s.iloc[:k].sum() / s.sum(), 1)})
+    return pd.DataFrame(rows).sort_values("activite_jour_station", ascending=False).reset_index(drop=True)
+
+
+# ---------------------------------------------------------------- Q2 sous-offre
+
+def grid_cells(ind: pd.DataFrame, cell_m: int = CELL_M) -> pd.DataFrame:
+    """Zones carrées d'environ `cell_m` mètres : % du temps vide (pondéré par les heures)."""
+    lat_step = cell_m / 111_320
+    d = ind.copy()
+    d["lon_step"] = lat_step / np.cos(np.radians(d["latitude"]))
+    d["cell_lat"] = (d["latitude"] / lat_step).round().astype(int)
+    d["cell_lon"] = (d["longitude"] / d["lon_step"]).round().astype(int)
+    g = d.groupby(["ville_id", "cell_lat", "cell_lon"]).agg(
+        stations=("station_id", "size"), heures=("heures", "sum"), vide=("vide", "sum"),
+        latitude=("latitude", "mean"), longitude=("longitude", "mean"),
+        activite_jour=("activite_jour", "sum"))
+    g["pct_vide"] = 100 * g["vide"] / g["heures"]
+    return g.reset_index().drop(columns=["heures", "vide"])
+
+
+# ---------------------------------------------------------------- Q3 pics
+
+def weekly_profile(agg: dict) -> pd.DataFrame:
+    """Activité moyenne par station et par heure : ville × jour de semaine × heure locale."""
+    w = agg["week"].reset_index()
+    w["activite_station_h"] = w["activite"] / w["heures"]
+    return w
+
+
+def peak_hours(week: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for v, g in week.groupby("ville_id"):
+        wd = g[g["wd"] < 5].groupby("h")["activite_station_h"].mean()
+        we = g[g["wd"] >= 5].groupby("h")["activite_station_h"].mean()
+        rows.append({"ville_id": v, "pic_matin_h": int(wd.loc[5:11].idxmax()),
+                     "pic_soir_h": int(wd.loc[14:21].idxmax()), "pic_weekend_h": int(we.idxmax()),
+                     "ratio_pic_creux": round(wd.max() / wd.loc[2:4].mean(), 1),
+                     "ratio_semaine_weekend": round(wd.mean() / we.mean(), 2)})
+    return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------- Q4 déséquilibres
+
+def imbalance_by_distance(ind: pd.DataFrame, bands=(0, 1, 2, 4, 8, 50)) -> pd.DataFrame:
+    d = ind.dropna(subset=["rempl_matin", "rempl_soir"]).copy()
+    d["zone"] = pd.cut(d["distance_centre_km"], bands, right=False,
+                       labels=[f"{a}-{b} km" for a, b in zip(bands[:-1], bands[1:])])
+    return d.groupby("zone", observed=True).agg(stations=("station_id", "size"),
+                                                rempl_matin=("rempl_matin", "mean"),
+                                                rempl_soir=("rempl_soir", "mean")).round(3).reset_index()
+
+
+# ---------------------------------------------------------------- Q5 criticité
+
+def critical_stations(ind: pd.DataFrame, n: int = 15) -> pd.DataFrame:
+    """Score = % des heures de pointe où la station est vide ou pleine (inutilisable pour emprunter / rendre)."""
+    d = ind.dropna(subset=["pct_vide_pointe", "pct_pleine_pointe"]).copy()
+    d["score_criticite"] = (d["pct_vide_pointe"] + d["pct_pleine_pointe"]).round(1)
+    d["action"] = np.where(d["pct_vide_pointe"] >= d["pct_pleine_pointe"], "réapprovisionner", "désengorger")
+    cols = ["ville_id", "station_nom", "score_criticite", "pct_vide_pointe", "pct_pleine_pointe", "action",
+            "activite_jour"]
+    return d.nlargest(n, "score_criticite")[cols].round(1).reset_index(drop=True)
+
+
+def critical_share(ind: pd.DataFrame, seuil: float = 30.0) -> pd.DataFrame:
+    """Par ville : part des stations critiques (vides ou pleines ≥ `seuil` % des heures de pointe)."""
+    d = ind.dropna(subset=["pct_vide_pointe"]).assign(
+        critique=lambda x: (x["pct_vide_pointe"] + x["pct_pleine_pointe"]) >= seuil)
+    return (d.groupby("ville_id").agg(stations=("station_id", "size"), critiques=("critique", "sum"))
+             .assign(pct_critiques=lambda x: (100 * x["critiques"] / x["stations"]).round(1))
+             .sort_values("pct_critiques", ascending=False).reset_index())
