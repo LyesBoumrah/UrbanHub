@@ -1,2 +1,0 @@
--- 40_gold : gold_ville_heure et vues métier (lit les tables P1 à P3, donc exécuté en dernier)
--- Responsable : commun.

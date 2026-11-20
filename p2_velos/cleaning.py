@@ -3,7 +3,7 @@
 Extrait les 7 variables demandées (station_id, station_name, latitude, longitude,
 bikes_available, free_slots, timestamp), applique les règles qualité P2 (incluant
 cohérence capacité / declared_slots, compteurs >= 0 et bbox de la ville), dédoublonne
-et charge les tables silver (ClickHouse ou Parquet/JSONL local).
+et écrit les fichiers Parquet silver dans le Data Lake (MinIO ou disque local).
 
 Utilisation CLI (rejeu complet de la couche bronze) :
 - Tout le bronze (streaming + historique 5 ans) : python -m p2_velos.cleaning --all [--local]
@@ -27,7 +27,6 @@ from typing import Any, Mapping, Sequence
 from common.config import get_settings, load_ref_ville
 from common.log import get_logger
 from common.storage import LocalBronzeStorage, MinIOStorage, get_storage
-from common.warehouse import ClickHouseWarehouse, get_warehouse
 from p2_velos.quality import (
     DEFAULT_MAX_AGE_MINUTES,
     QualityReport,
@@ -37,8 +36,6 @@ from p2_velos.quality import (
 )
 
 logger = get_logger(__name__)
-
-DEFAULT_CLICKHOUSE_BATCH_SIZE = 50_000
 
 _HIST_BRONZE_KEY_RE = re.compile(
     r"^bronze/velos_historique/(?P<ville_id>[^/]+)/(?P<year>\d{4})/(?P<ym>\d{6})-(?P<network>.+)-stats\.parquet$"
@@ -490,185 +487,22 @@ def save_silver_local(
         return releve_path
 
 
-def insert_df_in_chunks(
-    warehouse: ClickHouseWarehouse,
-    table: str,
-    df: Any,
-    chunk_size: int = DEFAULT_CLICKHOUSE_BATCH_SIZE,
-) -> int:
-    """Insère un DataFrame dans ClickHouse par lots pour maîtriser la consommation mémoire."""
-    total = 0
-    for start in range(0, len(df), chunk_size):
-        chunk = df.iloc[start:start + chunk_size]
-        total += warehouse.insert_df(table, chunk)
-    return total
-
-
-def load_warehouse_from_silver_parquet(
-    storage: MinIOStorage | LocalBronzeStorage,
-    warehouse: ClickHouseWarehouse,
-    releve_key: str | None,
-    station_key: str | None = None,
-) -> tuple[int, int]:
-    """Charge ClickHouse strictement à partir des fichiers Parquet de la couche silver."""
-    inserted_stations = 0
-    inserted_releves = 0
-
-    if station_key and storage.exists(station_key):
-        df_stations = storage.get_parquet(station_key)
-        if len(df_stations) > 0:
-            inserted_stations = insert_df_in_chunks(
-                warehouse, "urbanhub.velo_station", df_stations[STATION_COLUMNS]
-            )
-
-    if releve_key and storage.exists(releve_key):
-        df_releves = storage.get_parquet(releve_key)
-        if len(df_releves) > 0:
-            inserted_releves = insert_df_in_chunks(
-                warehouse, "urbanhub.velo_releve", df_releves[RELEVE_COLUMNS]
-            )
-
-    logger.info(
-        "ClickHouse chargé depuis Silver Parquet (%s) : %d stations, %d relevés",
-        releve_key or station_key,
-        inserted_stations,
-        inserted_releves,
-    )
-    return inserted_stations, inserted_releves
-
-
-def sync_silver_to_warehouse(
-    scope: str = "all",
-    cities: Sequence[str] | None = None,
-    storage: MinIOStorage | LocalBronzeStorage | None = None,
-    warehouse: ClickHouseWarehouse | None = None,
-    max_workers: int = 5,
-) -> dict[str, Any]:
-    """Charge dans ClickHouse l'ensemble des fichiers Parquet présents dans la couche silver MinIO."""
-    if scope not in {"all", "streaming", "historique"}:
-        raise ValueError(f"Scope invalide : {scope!r}")
-
-    target_storage = storage or get_storage(use_local=False)
-    target_warehouse = warehouse or get_warehouse()
-    wanted_cities = {c.strip().lower() for c in cities} if cities else None
-
-    loaded_files = 0
-    total_stations = 0
-    total_releves = 0
-    errors: list[dict[str, str]] = []
-
-    if scope in {"all", "streaming"}:
-        station_key = "silver/velos/velo_station_latest.parquet"
-        if target_storage.exists(station_key):
-            st_cnt, _ = load_warehouse_from_silver_parquet(target_storage, target_warehouse, None, station_key)
-            total_stations += st_cnt
-
-        keys = [
-            k
-            for k in target_storage.list("silver/velos/")
-            if k.endswith(".parquet") and not k.endswith("velo_station_latest.parquet")
-        ]
-        for key in keys:
-            try:
-                _, rel_cnt = load_warehouse_from_silver_parquet(target_storage, target_warehouse, key, None)
-                total_releves += rel_cnt
-                loaded_files += 1
-            except Exception as exc:
-                logger.error("[silver->ch][streaming] Erreur sur %s : %s", key, exc)
-                errors.append({"key": key, "error": str(exc)})
-
-    if scope in {"all", "historique"}:
-        hist_keys = [k for k in target_storage.list("silver/velos_historique/") if k.endswith(".parquet")]
-        by_year: dict[str, list[str]] = {}
-        station_keys: list[str] = []
-        for key in hist_keys:
-            parts = key.split("/")
-            ville_id = parts[2] if len(parts) >= 3 else ""
-            if wanted_cities and ville_id.lower() not in wanted_cities:
-                continue
-            if key.endswith("velo_station_latest.parquet"):
-                station_keys.append(key)
-            elif len(parts) >= 4:
-                by_year.setdefault(parts[3], []).append(key)
-
-        for st_key in station_keys:
-            try:
-                st_cnt, _ = load_warehouse_from_silver_parquet(target_storage, target_warehouse, None, st_key)
-                total_stations += st_cnt
-            except Exception as exc:
-                errors.append({"key": st_key, "error": str(exc)})
-
-        def _load_year(keys_year: list[str]) -> tuple[int, int, list[dict[str, str]]]:
-            yr_st = storage if storage is not None else get_storage(use_local=False)
-            yr_wh = warehouse if warehouse is not None else get_warehouse()
-            yf, yr, ye = 0, 0, []
-            for k in keys_year:
-                try:
-                    _, rc = load_warehouse_from_silver_parquet(yr_st, yr_wh, k, None)
-                    yr += rc
-                    yf += 1
-                except Exception as exc:
-                    ye.append({"key": k, "error": str(exc)})
-            return yf, yr, ye
-
-        if by_year:
-            workers = max(1, min(int(max_workers), len(by_year)))
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                futures = [executor.submit(_load_year, ks) for _, ks in sorted(by_year.items())]
-                for fut in as_completed(futures):
-                    yf, yr, ye = fut.result()
-                    loaded_files += yf
-                    total_releves += yr
-                    errors.extend(ye)
-
-    summary = {
-        "scope": scope,
-        "silver_files_loaded": loaded_files,
-        "inserted_stations": total_stations,
-        "inserted_releves": total_releves,
-        "errors": errors,
-    }
-    logger.info("Synchronisation Silver Parquet -> ClickHouse terminée : %s", summary)
-    return summary
-
-
-def load_silver_clickhouse(
-    warehouse: ClickHouseWarehouse,
-    stations: Sequence[Mapping[str, Any]],
-    releves: Sequence[Mapping[str, Any]],
-) -> tuple[int, int]:
-    """Charge les enregistrements silver dans urbanhub.velo_station et urbanhub.velo_releve."""
-    station_rows = [tuple(row[col] for col in STATION_COLUMNS) for row in stations]
-    releve_rows = [tuple(row[col] for col in RELEVE_COLUMNS) for row in releves]
-
-    inserted_stations = warehouse.insert_rows("urbanhub.velo_station", station_rows, STATION_COLUMNS)
-    inserted_releves = warehouse.insert_rows("urbanhub.velo_releve", releve_rows, RELEVE_COLUMNS)
-    logger.info(
-        "ClickHouse silver chargé : %d stations, %d relevés",
-        inserted_stations,
-        inserted_releves,
-    )
-    return inserted_stations, inserted_releves
-
-
 def replay_bronze_to_silver(
     scope: str = "all",
     cities: Sequence[str] | None = None,
     freq: str | None = "1h",
     use_local: bool = False,
     storage: MinIOStorage | LocalBronzeStorage | None = None,
-    warehouse: ClickHouseWarehouse | None = None,
     local_silver_base: Path | None = None,
     max_workers: int = 5,
 ) -> dict[str, Any]:
-    """Rejoue le nettoyage complet depuis la couche bronze (streaming et/ou historique 5 ans) -> silver."""
+    """Rejoue le nettoyage complet depuis la couche bronze (streaming et/ou historique 5 ans) -> silver Parquet."""
     if scope not in {"all", "streaming", "historique"}:
         raise ValueError(f"Scope invalide : {scope!r} (attendu: all, streaming, historique)")
 
     wanted_cities = {c.strip().lower() for c in cities} if cities else None
     bbox_map = get_bbox_map()
     target_storage = storage or get_storage(use_local=use_local)
-    target_warehouse = None if use_local else (warehouse or get_warehouse())
     silver_root = Path(local_silver_base or (get_settings().local_data_dir / "silver"))
 
     streaming_files = 0
@@ -717,19 +551,12 @@ def replay_bronze_to_silver(
                     filename_prefix="velo_releve_replay",
                 )
             else:
-                releve_key = save_silver_parquet_to_storage(
+                save_silver_parquet_to_storage(
                     target_storage,
                     deduped_stations,
                     deduped_releves,
                     releve_key=build_silver_streaming_key(prefix="velo_releve_replay"),
                 )
-                if target_warehouse is not None:
-                    load_warehouse_from_silver_parquet(
-                        target_storage,
-                        target_warehouse,
-                        releve_key=releve_key,
-                        station_key="silver/velos/velo_station_latest.parquet",
-                    )
 
     # 2. Rejeu du bronze historique Parquet en parallèle par année
     if scope in {"all", "historique"}:
@@ -745,7 +572,6 @@ def replay_bronze_to_silver(
 
         def _replay_year(year: str, items: list[tuple[str, dict[str, str]]]) -> tuple[int, int, list[dict[str, str]]]:
             yr_storage = storage if storage is not None else get_storage(use_local=use_local)
-            yr_wh = None if use_local else (warehouse if warehouse is not None else get_warehouse())
             yr_files = 0
             yr_rows = 0
             yr_errors: list[dict[str, str]] = []
@@ -767,20 +593,13 @@ def replay_bronze_to_silver(
                         df_releves.to_parquet(out_path, index=False)
                     else:
                         hist_station_key = f"silver/velos_historique/{ville_id}/velo_station_latest.parquet"
-                        hist_releve_key = save_silver_parquet_to_storage(
+                        save_silver_parquet_to_storage(
                             yr_storage,
                             df_stations,
                             df_releves,
                             releve_key=build_silver_historical_key(ville_id, year, meta["ym"]),
                             station_key=hist_station_key,
                         )
-                        if yr_wh is not None:
-                            load_warehouse_from_silver_parquet(
-                                yr_storage,
-                                yr_wh,
-                                releve_key=hist_releve_key,
-                                station_key=hist_station_key,
-                            )
 
                     yr_files += 1
                     yr_rows += stats["resampled_count"]
@@ -827,7 +646,7 @@ def replay_bronze_to_silver(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="P2 — Rejeu du nettoyage unifié bronze -> silver (streaming + historique 5 ans)"
+        description="P2 — Rejeu du nettoyage unifié bronze -> silver Parquet (streaming + historique 5 ans)"
     )
     scope_group = parser.add_mutually_exclusive_group()
     scope_group.add_argument("--all", action="store_true", help="Nettoyer streaming + historique 5 ans (défaut)")
@@ -839,12 +658,7 @@ def main() -> None:
         default="1h",
         help="Granularité de rééchantillonnage historique (défaut: 1h ; 'raw' pour brut)",
     )
-    parser.add_argument("--local", action="store_true", help="Lire/écrire dans data/ au lieu de MinIO/ClickHouse")
-    parser.add_argument(
-        "--load-warehouse",
-        action="store_true",
-        help="Synchroniser uniquement les fichiers Parquet existants de silver/ vers ClickHouse",
-    )
+    parser.add_argument("--local", action="store_true", help="Lire/écrire dans data/ au lieu de MinIO")
     parser.add_argument("--max-workers", type=int, default=5, help="Threads parallèles par année (défaut: 5)")
     args = parser.parse_args()
 
@@ -854,10 +668,6 @@ def main() -> None:
         scope = "historique"
     else:
         scope = "all"
-
-    if args.load_warehouse:
-        sync_silver_to_warehouse(scope=scope, cities=args.cities, max_workers=args.max_workers)
-        return
 
     freq_val = None if str(args.freq).lower() == "raw" else args.freq
     replay_bronze_to_silver(

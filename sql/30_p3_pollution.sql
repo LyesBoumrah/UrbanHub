@@ -1,2 +1,0 @@
--- 30_p3_pollution : tables air_capteur, air_mesure
--- Responsable : P3.

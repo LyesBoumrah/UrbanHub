@@ -1,5 +1,40 @@
-# UrbanHub — environnement Docker (images à version figée, jamais :latest)
-# Services : Silo/MinIO (bronze/silver S3), ClickHouse (DWH), CH-UI (client web SQL), worker P2, Streamlit.
+# UrbanHub — environnement Docker Data Lake 100 % MinIO (images à version figée, jamais :latest)
+# Services en parallèle :
+#   - minio               : Data Lake S3 (bronze/ brut -> silver/ Parquet -> gold/ JSON métier)
+#   - p1-meteo-worker     : Flux Batch parallèle Open-Meteo (5 ans + récent) -> bronze/meteo/ & silver/meteo/
+#   - p2-velos-worker     : Flux Streaming parallèle CityBikes (toutes les 3 min) -> bronze/velos/ & silver/velos/
+#   - p3-pollution-worker : Flux IoT parallèle OpenAQ v3 (horaire) -> bronze/openaq/ & silver/pollution/
+#   - p4-gold-worker      : Agrégation Silver Parquet -> Gold JSON métier (toutes les 3 min) -> gold/
+#   - streamlit           : Dashboard interactif (http://localhost:8501)
+
+x-worker-env: &worker-env
+  PYTHONPATH: /app
+  PYTHONUNBUFFERED: "1"
+  STORAGE: minio
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
+  MINIO_BUCKET_BRONZE: ${MINIO_BUCKET_BRONZE:-bronze}
+  MINIO_BUCKET_SILVER: ${MINIO_BUCKET_SILVER:-silver}
+  MINIO_BUCKET_GOLD: ${MINIO_BUCKET_GOLD:-gold}
+  OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
+  FETCH_DURATION: ${FETCH_DURATION:-1 semaine}
+  HTTP_USER_AGENT: ${HTTP_USER_AGENT:-UrbanHub-school-project/0.1}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-app-service: &app-service
+  image: urbanhub-app:0.1
+  build:
+    context: .
+    dockerfile: Dockerfile
+  working_dir: /app
+  volumes:
+    - .:/app
+  depends_on:
+    minio:
+      condition: service_healthy
+  restart: unless-stopped
+  environment: *worker-env
 
 services:
   minio:
@@ -21,102 +56,49 @@ services:
       timeout: 5s
       retries: 5
 
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.8.5
-    container_name: urbanhub-clickhouse
-    environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-urbanhub}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-urbanhub}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-    ports:
-      - "8123:8123"
-      - "9009:9000"
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./sql/00_commun.sql:/docker-entrypoint-initdb.d/00_commun.sql:ro
-      - ./sql/10_p1_meteo.sql:/docker-entrypoint-initdb.d/10_p1_meteo.sql:ro
-      - ./sql/20_p2_velos.sql:/docker-entrypoint-initdb.d/20_p2_velos.sql:ro
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  clickhouse-ui:
-    image: ghcr.io/caioricciuti/ch-ui:v2.33.0
-    container_name: urbanhub-clickhouse-ui
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-    ports:
-      - "${CH_UI_HOST_PORT:-3488}:3488"
-    environment:
-      CLICKHOUSE_URL: http://clickhouse:8123
-      CONNECTION_NAME: UrbanHub ClickHouse
-      APP_URL: http://localhost:${CH_UI_HOST_PORT:-3488}
-    volumes:
-      - ch_ui_data:/app/data
-
-  p2-velos-worker:
-    image: python:3.11.10-slim
-    container_name: urbanhub-p2-velos
-    working_dir: /app
-    volumes:
-      - .:/app
-    depends_on:
-      minio:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
-    environment:
-      PYTHONPATH: /app
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
-      MINIO_BUCKET: ${MINIO_BUCKET:-urbanhub}
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "8123"
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-urbanhub}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me}
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-urbanhub}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  p1-meteo-worker:
+    <<: *app-service
+    container_name: urbanhub-p1-meteo
     command: >
       /bin/sh -c "
-      pip install --no-cache-dir -q -r requirements.txt &&
-      python scripts/init_warehouse.py &&
+      python scripts/init_datalake.py &&
+      python -m p1_meteo.flow --daily --workers 6
+      "
+
+  p2-velos-worker:
+    <<: *app-service
+    container_name: urbanhub-p2-velos
+    command: >
+      /bin/sh -c "
+      python scripts/init_datalake.py &&
       python -m p2_velos.flow --interval 180
       "
 
-  streamlit:
-    image: python:3.11.10-slim
-    container_name: urbanhub-streamlit
-    working_dir: /app
-    volumes:
-      - .:/app
-    depends_on:
-      clickhouse:
-        condition: service_healthy
-    ports:
-      - "8501:8501"
-    environment:
-      PYTHONPATH: /app
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-urbanhub}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me}
-      MINIO_BUCKET: ${MINIO_BUCKET:-urbanhub}
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "8123"
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-urbanhub}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me}
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-urbanhub}
+  p3-pollution-worker:
+    <<: *app-service
+    container_name: urbanhub-p3-pollution
     command: >
       /bin/sh -c "
-      pip install --no-cache-dir -q -r requirements.txt &&
-      streamlit run dashboard/Accueil.py --server.port=8501 --server.address=0.0.0.0
+      python scripts/init_datalake.py &&
+      python -m p3_pollution.flow --loop --interval 3600 --workers 4
       "
+
+  p4-gold-worker:
+    <<: *app-service
+    container_name: urbanhub-p4-gold
+    command: >
+      /bin/sh -c "
+      python scripts/init_datalake.py &&
+      python -m p4_croise.flow --loop --interval 180
+      "
+
+  streamlit:
+    <<: *app-service
+    container_name: urbanhub-streamlit
+    ports:
+      - "8501:8501"
+    command: >
+      streamlit run dashboard/Accueil.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   minio_data:
-  clickhouse_data:
-  ch_ui_data:

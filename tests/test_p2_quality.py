@@ -366,3 +366,24 @@ def test_parse_historical_bronze_key_and_replay(tmp_path: Path):
     assert build_silver_historical_key("paris", 2025, "202506") == (
         "silver/velos_historique/paris/2025/velo_releve_202506.parquet"
     )
+
+
+def test_backfill_duration_filtre_strictement_la_fenetre(monkeypatch):
+    """Vérifie que `run_backfill(duration='1 mois')` ne télécharge pas de dumps vieux de 4–5 mois."""
+    from p2_velos import backfill as p2_backfill
+
+    fake_dumps = [
+        p2_backfill.HistoricalDump(
+            ville_id="paris", network_id="velib", year=2026, month=6, ym="202606",
+            filename="202606-velib-stats.parquet", url="https://example/202606", size_bytes=100,
+        ),
+        p2_backfill.HistoricalDump(
+            ville_id="paris", network_id="velib", year=2026, month=9, ym="202609",
+            filename="202609-velib-stats.parquet", url="https://example/202609", size_bytes=100,
+        ),
+    ]
+    monkeypatch.setattr(p2_backfill, "list_available_dumps", lambda **kwargs: fake_dumps)
+
+    res = p2_backfill.run_backfill(duration="1 mois", cities=["paris"], use_local=True)
+    assert res["dumps_total"] == 0
+    assert res["latest_available_ym"] == "202609"

@@ -158,7 +158,7 @@ def daily_usage_peaks(df: pd.DataFrame, tz: str = "Europe/Paris") -> pd.DataFram
 
     local_ts = data["timestamp"].dt.tz_convert(tz)
     data["heure_locale"] = local_ts.dt.hour
-    data["type_jour"] = local_ts.dt.dayofweek.map(lambda d: "Week-end" if d >= 5 else "Semaine")
+    data["type_jour"] = local_ts.dt.day_of_week.map(lambda d: "Week-end" if d >= 5 else "Semaine")
 
     peaks = (
         data.groupby(["ville_id", "type_jour", "heure_locale"], as_index=False)

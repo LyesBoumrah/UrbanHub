@@ -5,14 +5,25 @@
     "core_urbanhub": true,
     "lat": 48.8566,
     "lon": 2.3522,
-    "bbox": {"lat_min": 48.65, "lat_max": 49.05, "lon_min": 2.05, "lon_max": 2.65},
+    "bbox": {
+      "lat_min": 48.65,
+      "lat_max": 49.05,
+      "lon_min": 2.05,
+      "lon_max": 2.65
+    },
     "citybikes": {
       "network_id": "velib",
       "network_name": "Vélib' Métropole",
       "href": "/v2/networks/velib"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07149099999",
+    "openaq_location_ids": [
+      2162591,
+      4039,
+      4084,
+      4070,
+      4041
+    ]
   },
   {
     "ville_id": "lille",
@@ -20,14 +31,23 @@
     "core_urbanhub": true,
     "lat": 50.6292,
     "lon": 3.0573,
-    "bbox": {"lat_min": 50.50, "lat_max": 50.80, "lon_min": 2.85, "lon_max": 3.30},
+    "bbox": {
+      "lat_min": 50.5,
+      "lat_max": 50.8,
+      "lon_min": 2.85,
+      "lon_max": 3.3
+    },
     "citybikes": {
       "network_id": "vlille",
       "network_name": "V'Lille",
       "href": "/v2/networks/vlille"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07015099999",
+    "openaq_location_ids": [
+      3831,
+      2162762,
+      3598
+    ]
   },
   {
     "ville_id": "marseille",
@@ -35,14 +55,24 @@
     "core_urbanhub": true,
     "lat": 43.2965,
     "lon": 5.3698,
-    "bbox": {"lat_min": 43.18, "lat_max": 43.42, "lon_min": 5.25, "lon_max": 5.55},
+    "bbox": {
+      "lat_min": 43.18,
+      "lat_max": 43.42,
+      "lon_min": 5.25,
+      "lon_max": 5.55
+    },
     "citybikes": {
       "network_id": "le-velo",
       "network_name": "LeVélo",
       "href": "/v2/networks/le-velo"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07650099999",
+    "openaq_location_ids": [
+      2162726,
+      6488476,
+      2162724,
+      2162727
+    ]
   },
   {
     "ville_id": "rouen",
@@ -50,29 +80,51 @@
     "core_urbanhub": true,
     "lat": 49.4432,
     "lon": 1.0999,
-    "bbox": {"lat_min": 49.30, "lat_max": 49.55, "lon_min": 0.90, "lon_max": 1.30},
+    "bbox": {
+      "lat_min": 49.3,
+      "lat_max": 49.55,
+      "lon_min": 0.9,
+      "lon_max": 1.3
+    },
     "citybikes": {
       "network_id": "lovelolibreservice",
       "network_name": "Lovélo Libre Service",
       "href": "/v2/networks/lovelolibreservice"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07037099999",
+    "openaq_location_ids": [
+      2162684,
+      2162686,
+      4160643,
+      4126,
+      3461
+    ]
   },
   {
     "ville_id": "lyon",
     "nom": "Lyon",
     "core_urbanhub": true,
-    "lat": 45.7640,
+    "lat": 45.764,
     "lon": 4.8357,
-    "bbox": {"lat_min": 45.62, "lat_max": 45.90, "lon_min": 4.65, "lon_max": 5.05},
+    "bbox": {
+      "lat_min": 45.62,
+      "lat_max": 45.9,
+      "lon_min": 4.65,
+      "lon_max": 5.05
+    },
     "citybikes": {
       "network_id": "velov",
       "network_name": "Vélo'V",
       "href": "/v2/networks/velov"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07480099999",
+    "openaq_location_ids": [
+      2696,
+      2680,
+      3638,
+      3586,
+      3647
+    ]
   },
   {
     "ville_id": "toulouse",
@@ -80,14 +132,25 @@
     "core_urbanhub": false,
     "lat": 43.6047,
     "lon": 1.4442,
-    "bbox": {"lat_min": 43.48, "lat_max": 43.72, "lon_min": 1.28, "lon_max": 1.60},
+    "bbox": {
+      "lat_min": 43.48,
+      "lat_max": 43.72,
+      "lon_min": 1.28,
+      "lon_max": 1.6
+    },
     "citybikes": {
       "network_id": "velo",
       "network_name": "Vélô",
       "href": "/v2/networks/velo"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07630099999",
+    "openaq_location_ids": [
+      2162671,
+      3590,
+      2162669,
+      6529885,
+      2162670
+    ]
   },
   {
     "ville_id": "bordeaux",
@@ -95,14 +158,25 @@
     "core_urbanhub": false,
     "lat": 44.8378,
     "lon": -0.5792,
-    "bbox": {"lat_min": 44.70, "lat_max": 44.98, "lon_min": -0.78, "lon_max": -0.38},
+    "bbox": {
+      "lat_min": 44.7,
+      "lat_max": 44.98,
+      "lon_min": -0.78,
+      "lon_max": -0.38
+    },
     "citybikes": {
       "network_id": "v3-bordeaux",
       "network_name": "V³",
       "href": "/v2/networks/v3-bordeaux"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07510099999",
+    "openaq_location_ids": [
+      2162620,
+      2162616,
+      2162617,
+      2162618,
+      3005840
+    ]
   },
   {
     "ville_id": "nantes",
@@ -110,14 +184,24 @@
     "core_urbanhub": false,
     "lat": 47.2184,
     "lon": -1.5536,
-    "bbox": {"lat_min": 47.10, "lat_max": 47.34, "lon_min": -1.72, "lon_max": -1.38},
+    "bbox": {
+      "lat_min": 47.1,
+      "lat_max": 47.34,
+      "lon_min": -1.72,
+      "lon_max": -1.38
+    },
     "citybikes": {
       "network_id": "bicloo",
       "network_name": "Bicloo",
       "href": "/v2/networks/bicloo"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07222099999",
+    "openaq_location_ids": [
+      6159395,
+      6159397,
+      2162596,
+      3792
+    ]
   },
   {
     "ville_id": "strasbourg",
@@ -125,14 +209,25 @@
     "core_urbanhub": false,
     "lat": 48.5836,
     "lon": 7.7481,
-    "bbox": {"lat_min": 48.46, "lat_max": 48.70, "lon_min": 7.58, "lon_max": 7.90},
+    "bbox": {
+      "lat_min": 48.46,
+      "lat_max": 48.7,
+      "lon_min": 7.58,
+      "lon_max": 7.9
+    },
     "citybikes": {
       "network_id": "velhop",
       "network_name": "Vélhop",
       "href": "/v2/networks/velhop"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07190099999",
+    "openaq_location_ids": [
+      3196,
+      3775,
+      2162767,
+      3777,
+      2162766
+    ]
   },
   {
     "ville_id": "montpellier",
@@ -140,14 +235,25 @@
     "core_urbanhub": false,
     "lat": 43.6119,
     "lon": 3.8772,
-    "bbox": {"lat_min": 43.50, "lat_max": 43.72, "lon_min": 3.72, "lon_max": 4.05},
+    "bbox": {
+      "lat_min": 43.5,
+      "lat_max": 43.72,
+      "lon_min": 3.72,
+      "lon_max": 4.05
+    },
     "citybikes": {
       "network_id": "velomagg",
       "network_name": "Vélomagg",
       "href": "/v2/networks/velomagg"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07643099999",
+    "openaq_location_ids": [
+      2720,
+      2162662,
+      2162661,
+      5566646,
+      2162659
+    ]
   },
   {
     "ville_id": "rennes",
@@ -155,14 +261,24 @@
     "core_urbanhub": false,
     "lat": 48.1142,
     "lon": -1.6808,
-    "bbox": {"lat_min": 48.00, "lat_max": 48.22, "lon_min": -1.85, "lon_max": -1.52},
+    "bbox": {
+      "lat_min": 48.0,
+      "lat_max": 48.22,
+      "lon_min": -1.85,
+      "lon_max": -1.52
+    },
     "citybikes": {
       "network_id": "le-velo-star",
       "network_name": "LE vélo Star",
       "href": "/v2/networks/le-velo-star"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07130099999",
+    "openaq_location_ids": [
+      2162748,
+      2162747,
+      4036,
+      2162749
+    ]
   },
   {
     "ville_id": "clermont-ferrand",
@@ -170,13 +286,24 @@
     "core_urbanhub": false,
     "lat": 45.7831,
     "lon": 3.0824,
-    "bbox": {"lat_min": 45.68, "lat_max": 45.88, "lon_min": 2.95, "lon_max": 3.22},
+    "bbox": {
+      "lat_min": 45.68,
+      "lat_max": 45.88,
+      "lon_min": 2.95,
+      "lon_max": 3.22
+    },
     "citybikes": {
       "network_id": "c-velo",
       "network_name": "C.vélo",
       "href": "/v2/networks/c-velo"
     },
-    "noaa_station_id": null,
-    "openaq_location_ids": []
+    "noaa_station_id": "07460099999",
+    "openaq_location_ids": [
+      3727,
+      3624,
+      2162732,
+      2162731,
+      3708
+    ]
   }
 ]

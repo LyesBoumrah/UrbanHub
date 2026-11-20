@@ -30,8 +30,6 @@ def get_logger(name: str | None = None, level: str | None = None) -> logging.Log
     return logger
 
 
-# Alias rétrocompatible utilisé par P1
-setup_logging = get_logger
 def setup_logging(name: str | None = None) -> logging.Logger:
     """Compatibilité P1 : alias de get_logger (nom par défaut « urbanhub »)."""
     return get_logger(name or "urbanhub")
